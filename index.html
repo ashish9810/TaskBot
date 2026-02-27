@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ping - Task Management for Slack</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f9fa;
+      color: #333;
+    }
+
+    header {
+      background: #fff;
+      padding: 20px 40px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+    }
+
+    header h1 {
+      font-size: 24px;
+      color: #1a1a1a;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 80px 20px 60px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .hero h2 {
+      font-size: 48px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .hero p {
+      font-size: 20px;
+      margin-bottom: 40px;
+      opacity: 0.9;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .add-to-slack {
+      display: inline-block;
+      background: #fff;
+      color: #1a1a1a;
+      padding: 16px 32px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 18px;
+      font-weight: 600;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .add-to-slack:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+
+    .add-to-slack img {
+      vertical-align: middle;
+      margin-right: 10px;
+    }
+
+    .features {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      padding: 60px 40px;
+      max-width: 1000px;
+      margin: 0 auto;
+      flex-wrap: wrap;
+    }
+
+    .feature {
+      text-align: center;
+      max-width: 250px;
+    }
+
+    .feature .icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .feature h3 {
+      font-size: 20px;
+      margin-bottom: 10px;
+      color: #1a1a1a;
+    }
+
+    .feature p {
+      color: #666;
+      line-height: 1.6;
+    }
+
+    .cta {
+      text-align: center;
+      padding: 60px 20px;
+      background: #fff;
+      border-top: 1px solid #eee;
+    }
+
+    .cta h2 {
+      font-size: 32px;
+      margin-bottom: 20px;
+      color: #1a1a1a;
+    }
+
+    .cta p {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 16px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: #999;
+      font-size: 14px;
+      border-top: 1px solid #eee;
+    }
+
+    footer a {
+      color: #667eea;
+      text-decoration: none;
+      margin: 0 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🏓 Ping</h1>
+  </header>
+
+  <section class="hero">
+    <h2>Task Management<br>inside Slack</h2>
+    <p>Ping helps teams track tasks, monitor progress, and stay aligned — all without leaving Slack.</p>
+    <a href="https://slack.com/oauth/v2/authorize?client_id=10571573067766.10571623106582&scope=chat:write,users:read,users:read.email&user_scope=" class="add-to-slack">
+      <img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack.svg" width="24" height="24" alt="Slack">
+      Add to Slack
+    </a>
+  </section>
+
+  <section class="features">
+    <div class="feature">
+      <div class="icon">📋</div>
+      <h3>My Tasks</h3>
+      <p>Add, track, and complete your tasks directly from your Slack home tab.</p>
+    </div>
+    <div class="feature">
+      <div class="icon">👥</div>
+      <h3>People</h3>
+      <p>View your teammates' tasks and progress updates in one place.</p>
+    </div>
+    <div class="feature">
+      <div class="icon">📌</div>
+      <h3>Pinned</h3>
+      <p>Pin your most important team members for quick access to their tasks.</p>
+    </div>
+  </section>
+
+  <section class="cta">
+    <h2>Ready to get started?</h2>
+    <p>Install Ping in your Slack workspace in seconds.</p>
+    <a href="https://slack.com/oauth/v2/authorize?client_id=10571573067766.10571623106582&scope=chat:write,users:read,users:read.email&user_scope=" class="add-to-slack">
+      <img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack.svg" width="24" height="24" alt="Slack">
+      Add to Slack
+    </a>
+  </section>
+
+  <footer>
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="support.html">Support</a>
+    <span>© 2026 Ping</span>
+  </footer>
+
+</body>
+</html>
