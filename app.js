@@ -1,8 +1,7 @@
 require('dotenv').config();
 
-const { App } = require('@slack/bolt');
+const { App, ExpressReceiver } = require('@slack/bolt');
 const { createClient } = require('@supabase/supabase-js');
-
 
 // =============================
 // SUPABASE
@@ -13,16 +12,84 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
+// =============================
+// EXPRESS RECEIVER (for OAuth)
+// =============================
+
+const receiver = new ExpressReceiver({
+  signingSecret: process.env.SLACK_SIGNING_SECRET,
+  clientId: process.env.SLACK_CLIENT_ID,
+  clientSecret: process.env.SLACK_CLIENT_SECRET,
+  stateSecret: process.env.SLACK_STATE_SECRET,
+  scopes: [
+    'app_mentions:read',
+    'channels:read',
+    'chat:write',
+    'users:read',
+    'users:read.email',
+  ],
+  installationStore: {
+    storeInstallation: async (installation) => {
+      const teamId = installation.isEnterpriseInstall
+        ? installation.enterprise.id
+        : installation.team.id;
+      const teamName = installation.isEnterpriseInstall
+        ? installation.enterprise.name
+        : installation.team.name;
+
+      await supabase.from('installations').upsert({
+        team_id: teamId,
+        team_name: teamName,
+        bot_token: installation.bot.token,
+        bot_id: installation.bot.id,
+        bot_user_id: installation.bot.userId,
+        installed_at: new Date().toISOString()
+      }, { onConflict: 'team_id' });
+
+      console.log(`✅ Installed for workspace: ${teamName} (${teamId})`);
+    },
+    fetchInstallation: async (installQuery) => {
+      const teamId = installQuery.isEnterpriseInstall
+        ? installQuery.enterpriseId
+        : installQuery.teamId;
+
+      const { data, error } = await supabase
+        .from('installations')
+        .select('*')
+        .eq('team_id', teamId)
+        .single();
+
+      if (error || !data) throw new Error(`No installation found for team ${teamId}`);
+
+      return {
+        bot: {
+          token: data.bot_token,
+          id: data.bot_id,
+          userId: data.bot_user_id
+        },
+        team: { id: teamId, name: data.team_name },
+        isEnterpriseInstall: false
+      };
+    },
+    deleteInstallation: async (installQuery) => {
+      const teamId = installQuery.isEnterpriseInstall
+        ? installQuery.enterpriseId
+        : installQuery.teamId;
+      await supabase.from('installations').delete().eq('team_id', teamId);
+    }
+  }
+});
 
 // =============================
 // SLACK APP
 // =============================
 
-const app = new App({
-  token: process.env.SLACK_BOT_TOKEN,
-  signingSecret: process.env.SLACK_SIGNING_SECRET
-});
+const app = new App({ receiver });
 
+// Helper to get team_id from body
+function getTeamId(body) {
+  return body.team_id || body.team?.id || '';
+}
 
 // =============================
 // HELPERS
@@ -63,7 +130,7 @@ function buildNavBar() {
 // SYNC USERS
 // =============================
 
-async function syncUsers(client) {
+async function syncUsers(client, teamId) {
   const result = await client.users.list();
 
   for (const member of result.members) {
@@ -71,14 +138,15 @@ async function syncUsers(client) {
 
     await supabase.from('users').upsert({
       slack_user_id: member.id,
+      team_id: teamId,
       name: member.real_name,
       email: member.profile.email
-    });
+    }, { onConflict: 'slack_user_id,team_id' });
   }
 }
 
-function syncUsersBackground(client) {
-  syncUsers(client).catch(err =>
+function syncUsersBackground(client, teamId) {
+  syncUsers(client, teamId).catch(err =>
     console.error('syncUsers background error:', err)
   );
 }
@@ -88,14 +156,12 @@ function syncUsersBackground(client) {
 // VIEW BUILDERS
 // =============================
 
-async function buildMyTasksView(userId) {
+async function buildMyTasksView(userId, teamId) {
   let blocks = [];
 
-  // Nav
   blocks.push(buildNavBar());
   blocks.push({ type: "divider" });
 
-  // Add Task button
   blocks.push({
     type: "actions",
     elements: [
@@ -110,13 +176,12 @@ async function buildMyTasksView(userId) {
 
   blocks.push({ type: "divider" });
 
-  // Fetch all tasks + all updates for this user in parallel (single round-trip pair)
   const [
     { data: allTasks },
     { data: allUpdatesRaw }
   ] = await Promise.all([
-    supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-    supabase.from('updates').select('id, task_id').eq('user_id', userId)
+    supabase.from('tasks').select('*').eq('user_id', userId).eq('team_id', teamId).order('created_at', { ascending: false }),
+    supabase.from('updates').select('id, task_id').eq('user_id', userId).eq('team_id', teamId)
   ]);
 
   const active    = (allTasks || []).filter(t => t.status === 'active');
@@ -125,7 +190,6 @@ async function buildMyTasksView(userId) {
   const deleted   = (allTasks || []).filter(t => t.status === 'deleted')
                       .sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
 
-  // Build updates count map
   let updatesByTaskId = {};
   for (const upd of (allUpdatesRaw || [])) {
     updatesByTaskId[upd.task_id] = (updatesByTaskId[upd.task_id] || 0) + 1;
@@ -264,7 +328,7 @@ async function buildMyTasksView(userId) {
 }
 
 
-async function buildPeopleView(userId, searchQuery = '') {
+async function buildPeopleView(userId, teamId, searchQuery = '') {
   let blocks = [];
 
   blocks.push(buildNavBar());
@@ -275,7 +339,6 @@ async function buildPeopleView(userId, searchQuery = '') {
     text: { type: "plain_text", text: "👥 People" }
   });
 
-  // Search input
   blocks.push({
     type: "input",
     block_id: "people_search_block",
@@ -292,18 +355,16 @@ async function buildPeopleView(userId, searchQuery = '') {
 
   blocks.push({ type: "divider" });
 
-  // Fetch all users + current user's pins in parallel
   const [
     { data: allUsers },
     { data: pins }
   ] = await Promise.all([
-    supabase.from('users').select('slack_user_id, name, email').order('name'),
-    supabase.from('favorites').select('favorite_user_id').eq('manager_user_id', userId)
+    supabase.from('users').select('slack_user_id, name, email').eq('team_id', teamId).order('name'),
+    supabase.from('favorites').select('favorite_user_id').eq('manager_user_id', userId).eq('team_id', teamId)
   ]);
 
   const pinnedIds = new Set((pins || []).map(p => p.favorite_user_id));
 
-  // Filter by search query
   const q = (searchQuery || '').toLowerCase().trim();
   const filtered = (allUsers || []).filter(u => {
     if (!q) return true;
@@ -355,7 +416,7 @@ async function buildPeopleView(userId, searchQuery = '') {
 }
 
 
-async function buildPinnedView(userId) {
+async function buildPinnedView(userId, teamId) {
   let blocks = [];
 
   blocks.push(buildNavBar());
@@ -369,7 +430,8 @@ async function buildPinnedView(userId) {
   const { data: pins } = await supabase
     .from('favorites')
     .select('favorite_user_id')
-    .eq('manager_user_id', userId);
+    .eq('manager_user_id', userId)
+    .eq('team_id', teamId);
 
   if (!pins || pins.length === 0) {
     blocks.push({
@@ -388,6 +450,7 @@ async function buildPinnedView(userId) {
     .from('users')
     .select('slack_user_id, name, email')
     .in('slack_user_id', pinnedIds)
+    .eq('team_id', teamId)
     .order('name');
 
   for (const user of (pinnedUsers || [])) {
@@ -424,21 +487,19 @@ async function buildPinnedView(userId) {
 }
 
 
-async function buildPersonTasksBlocks(targetUserId) {
-  // Fetch all tasks + all updates for this person in parallel
+async function buildPersonTasksBlocks(targetUserId, teamId) {
   const [
     { data: allTasks },
     { data: allUpdatesRaw }
   ] = await Promise.all([
-    supabase.from('tasks').select('*').eq('user_id', targetUserId).order('created_at', { ascending: false }),
-    supabase.from('updates').select('id, task_id').eq('user_id', targetUserId)
+    supabase.from('tasks').select('*').eq('user_id', targetUserId).eq('team_id', teamId).order('created_at', { ascending: false }),
+    supabase.from('updates').select('id, task_id').eq('user_id', targetUserId).eq('team_id', teamId)
   ]);
 
   const activeTasks    = (allTasks || []).filter(t => t.status === 'active');
   const completedTasks = (allTasks || []).filter(t => t.status === 'completed')
                            .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
 
-  // Build update count map
   const updatesByTaskId = {};
   for (const upd of (allUpdatesRaw || [])) {
     updatesByTaskId[upd.task_id] = (updatesByTaskId[upd.task_id] || 0) + 1;
@@ -534,15 +595,15 @@ async function buildPersonTasksBlocks(targetUserId) {
 // PUBLISH HOME
 // =============================
 
-async function publishHome(client, userId, mode = 'my_tasks', searchQuery = '') {
+async function publishHome(client, userId, teamId, mode = 'my_tasks', searchQuery = '') {
   let blocks;
 
   if (mode === 'people') {
-    blocks = await buildPeopleView(userId, searchQuery);
+    blocks = await buildPeopleView(userId, teamId, searchQuery);
   } else if (mode === 'pinned') {
-    blocks = await buildPinnedView(userId);
+    blocks = await buildPinnedView(userId, teamId);
   } else {
-    blocks = await buildMyTasksView(userId);
+    blocks = await buildMyTasksView(userId, teamId);
   }
 
   await client.views.publish({
@@ -556,9 +617,10 @@ async function publishHome(client, userId, mode = 'my_tasks', searchQuery = '') 
 // HOME EVENT
 // =============================
 
-app.event('app_home_opened', async ({ event, client }) => {
-  syncUsersBackground(client);
-  await publishHome(client, event.user, 'my_tasks');
+app.event('app_home_opened', async ({ event, client, body }) => {
+  const teamId = getTeamId(body);
+  syncUsersBackground(client, teamId);
+  await publishHome(client, event.user, teamId, 'my_tasks');
 });
 
 
@@ -568,17 +630,17 @@ app.event('app_home_opened', async ({ event, client }) => {
 
 app.action('nav_my_tasks', async ({ ack, body, client }) => {
   await ack();
-  await publishHome(client, body.user.id, 'my_tasks');
+  await publishHome(client, body.user.id, getTeamId(body), 'my_tasks');
 });
 
 app.action('nav_people', async ({ ack, body, client }) => {
   await ack();
-  await publishHome(client, body.user.id, 'people');
+  await publishHome(client, body.user.id, getTeamId(body), 'people');
 });
 
 app.action('nav_pinned', async ({ ack, body, client }) => {
   await ack();
-  await publishHome(client, body.user.id, 'pinned');
+  await publishHome(client, body.user.id, getTeamId(body), 'pinned');
 });
 
 
@@ -594,6 +656,7 @@ app.action('add_task', async ({ ack, body, client }) => {
     view: {
       type: "modal",
       callback_id: "submit_task",
+      private_metadata: getTeamId(body),
       title: { type: "plain_text", text: "Add Task" },
       submit: { type: "plain_text", text: "Create" },
       blocks: [
@@ -616,14 +679,16 @@ app.view('submit_task', async ({ ack, body, view, client }) => {
   await ack();
 
   const title = view.state.values.task.name.value;
+  const teamId = view.private_metadata;
 
   await supabase.from('tasks').insert({
     title,
     user_id: body.user.id,
+    team_id: teamId,
     status: "active"
   });
 
-  await publishHome(client, body.user.id, 'my_tasks');
+  await publishHome(client, body.user.id, teamId, 'my_tasks');
 });
 
 
@@ -635,13 +700,14 @@ app.action('update_progress', async ({ ack, body, client }) => {
   await ack();
 
   const taskId = body.actions[0].value;
+  const teamId = getTeamId(body);
 
   await client.views.open({
     trigger_id: body.trigger_id,
     view: {
       type: "modal",
       callback_id: "submit_update",
-      private_metadata: taskId,
+      private_metadata: JSON.stringify({ taskId, teamId }),
       title: { type: "plain_text", text: "Add Progress Update" },
       submit: { type: "plain_text", text: "Save" },
       blocks: [
@@ -664,13 +730,16 @@ app.action('update_progress', async ({ ack, body, client }) => {
 app.view('submit_update', async ({ ack, body, view, client }) => {
   await ack();
 
+  const { taskId, teamId } = JSON.parse(view.private_metadata);
+
   await supabase.from('updates').insert({
-    task_id: view.private_metadata,
+    task_id: taskId,
     content: view.state.values.update.content.value,
-    user_id: body.user.id
+    user_id: body.user.id,
+    team_id: teamId
   });
 
-  await publishHome(client, body.user.id, 'my_tasks');
+  await publishHome(client, body.user.id, teamId, 'my_tasks');
 });
 
 
@@ -682,13 +751,17 @@ app.action('view_updates', async ({ ack, body, client }) => {
   await ack();
 
   const taskId = body.actions[0].value;
+  const teamId = getTeamId(body);
   const fromModal = body.view?.type === 'modal';
 
-  // When triggered from a person's tasks modal, capture their userId so
-  // the "← Back" button can navigate back to their tasks view.
-  const parentUserId = fromModal
-    ? (body.view.private_metadata || '')
-    : '';
+  let parentMeta = {};
+  if (fromModal && body.view.private_metadata) {
+    try {
+      parentMeta = JSON.parse(body.view.private_metadata);
+    } catch {
+      parentMeta = { targetUserId: body.view.private_metadata };
+    }
+  }
 
   const [
     { data: task },
@@ -700,16 +773,15 @@ app.action('view_updates', async ({ ack, body, client }) => {
 
   let blocks = [];
 
-  // "← Back" button — only shown when opened from inside a person's tasks modal
   if (fromModal) {
-    const backUserId = parentUserId || task?.user_id || '';
+    const backUserId = parentMeta.targetUserId || task?.user_id || '';
     blocks.push({
       type: "actions",
       elements: [
         {
           type: "button",
           text: { type: "plain_text", text: "← Back" },
-          value: backUserId,
+          value: JSON.stringify({ targetUserId: backUserId, teamId }),
           action_id: "back_to_person_tasks"
         }
       ]
@@ -740,12 +812,11 @@ app.action('view_updates', async ({ ack, body, client }) => {
   const modalView = {
     type: "modal",
     title: { type: "plain_text", text: titleText },
-    private_metadata: parentUserId,
+    private_metadata: JSON.stringify({ targetUserId: parentMeta.targetUserId || task?.user_id || '', teamId }),
     blocks
   };
 
   if (fromModal) {
-    // Replace current modal in-place — avoids Slack's 3-level push stack limit
     await client.views.update({ view_id: body.view.id, view: modalView });
   } else {
     await client.views.open({ trigger_id: body.trigger_id, view: modalView });
@@ -760,14 +831,14 @@ app.action('view_updates', async ({ ack, body, client }) => {
 app.action('back_to_person_tasks', async ({ ack, body, client }) => {
   await ack();
 
-  const targetUserId = body.actions[0].value;
+  const { targetUserId, teamId } = JSON.parse(body.actions[0].value);
 
   const [
     { data: targetUser },
     taskBlocks
   ] = await Promise.all([
-    supabase.from('users').select('name').eq('slack_user_id', targetUserId).single(),
-    buildPersonTasksBlocks(targetUserId)
+    supabase.from('users').select('name').eq('slack_user_id', targetUserId).eq('team_id', teamId).single(),
+    buildPersonTasksBlocks(targetUserId, teamId)
   ]);
 
   const name = (targetUser?.name || 'User').substring(0, 18);
@@ -777,7 +848,7 @@ app.action('back_to_person_tasks', async ({ ack, body, client }) => {
     view: {
       type: "modal",
       title: { type: "plain_text", text: `${name}'s Tasks` },
-      private_metadata: targetUserId,
+      private_metadata: JSON.stringify({ targetUserId, teamId }),
       blocks: taskBlocks
     }
   });
@@ -796,7 +867,7 @@ app.action('complete_task', async ({ ack, body, client }) => {
     completed_at: new Date()
   }).eq('id', body.actions[0].value);
 
-  await publishHome(client, body.user.id, 'my_tasks');
+  await publishHome(client, body.user.id, getTeamId(body), 'my_tasks');
 });
 
 
@@ -812,7 +883,7 @@ app.action('delete_task', async ({ ack, body, client }) => {
     deleted_at: new Date()
   }).eq('id', body.actions[0].value);
 
-  await publishHome(client, body.user.id, 'my_tasks');
+  await publishHome(client, body.user.id, getTeamId(body), 'my_tasks');
 });
 
 
@@ -823,7 +894,7 @@ app.action('delete_task', async ({ ack, body, client }) => {
 app.action('people_search', async ({ ack, body, client }) => {
   await ack();
   const searchQuery = body.actions[0].value || '';
-  await publishHome(client, body.user.id, 'people', searchQuery);
+  await publishHome(client, body.user.id, getTeamId(body), 'people', searchQuery);
 });
 
 
@@ -835,13 +906,14 @@ app.action('view_person_tasks', async ({ ack, body, client }) => {
   await ack();
 
   const targetUserId = body.actions[0].value;
+  const teamId = getTeamId(body);
 
   const [
     { data: targetUser },
     taskBlocks
   ] = await Promise.all([
-    supabase.from('users').select('name').eq('slack_user_id', targetUserId).single(),
-    buildPersonTasksBlocks(targetUserId)
+    supabase.from('users').select('name').eq('slack_user_id', targetUserId).eq('team_id', teamId).single(),
+    buildPersonTasksBlocks(targetUserId, teamId)
   ]);
 
   const name = (targetUser?.name || 'User').substring(0, 18);
@@ -852,7 +924,7 @@ app.action('view_person_tasks', async ({ ack, body, client }) => {
       type: "modal",
       title: { type: "plain_text", text: `${name}'s Tasks` },
       close: { type: "plain_text", text: "Close" },
-      private_metadata: targetUserId,
+      private_metadata: JSON.stringify({ targetUserId, teamId }),
       blocks: taskBlocks
     }
   });
@@ -867,13 +939,15 @@ app.action('pin_employee', async ({ ack, body, client }) => {
   await ack();
 
   const [targetUserId] = body.actions[0].value.split(':');
+  const teamId = getTeamId(body);
 
   await supabase.from('favorites').upsert({
     manager_user_id: body.user.id,
-    favorite_user_id: targetUserId
-  });
+    favorite_user_id: targetUserId,
+    team_id: teamId
+  }, { onConflict: 'manager_user_id,favorite_user_id,team_id' });
 
-  await publishHome(client, body.user.id, 'people');
+  await publishHome(client, body.user.id, teamId, 'people');
 });
 
 
@@ -885,13 +959,15 @@ app.action('unpin_employee', async ({ ack, body, client }) => {
   await ack();
 
   const [targetUserId, returnView] = body.actions[0].value.split(':');
+  const teamId = getTeamId(body);
 
   await supabase.from('favorites')
     .delete()
     .eq('manager_user_id', body.user.id)
-    .eq('favorite_user_id', targetUserId);
+    .eq('favorite_user_id', targetUserId)
+    .eq('team_id', teamId);
 
-  await publishHome(client, body.user.id, returnView || 'people');
+  await publishHome(client, body.user.id, teamId, returnView || 'people');
 });
 
 
@@ -903,13 +979,14 @@ app.action('view_pinned_tasks', async ({ ack, body, client }) => {
   await ack();
 
   const targetUserId = body.actions[0].value;
+  const teamId = getTeamId(body);
 
   const [
     { data: targetUser },
     taskBlocks
   ] = await Promise.all([
-    supabase.from('users').select('name').eq('slack_user_id', targetUserId).single(),
-    buildPersonTasksBlocks(targetUserId)
+    supabase.from('users').select('name').eq('slack_user_id', targetUserId).eq('team_id', teamId).single(),
+    buildPersonTasksBlocks(targetUserId, teamId)
   ]);
 
   const name = (targetUser?.name || 'User').substring(0, 18);
@@ -920,7 +997,7 @@ app.action('view_pinned_tasks', async ({ ack, body, client }) => {
       type: "modal",
       title: { type: "plain_text", text: `${name}'s Tasks` },
       close: { type: "plain_text", text: "Close" },
-      private_metadata: targetUserId,
+      private_metadata: JSON.stringify({ targetUserId, teamId }),
       blocks: taskBlocks
     }
   });
@@ -932,6 +1009,6 @@ app.action('view_pinned_tasks', async ({ ack, body, client }) => {
 // =============================
 
 (async () => {
-  await app.start(3000);
-  console.log("⚡ TaskBot is live on port 3000");
+  await app.start(process.env.PORT || 3000);
+  console.log("⚡ TaskBot is live on port", process.env.PORT || 3000);
 })();
