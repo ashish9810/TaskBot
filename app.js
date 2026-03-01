@@ -107,25 +107,20 @@ function formatDate(dateStr) {
   });
 }
 
-function buildNavBar() {
+function buildNavBar(activeMode) {
+  const btn = (text, actionId, mode) => ({
+    type: "button",
+    text: { type: "plain_text", text },
+    action_id: actionId,
+    ...(activeMode === mode ? { style: "primary" } : {})
+  });
+
   return {
     type: "actions",
     elements: [
-      {
-        type: "button",
-        text: { type: "plain_text", text: "My Tasks" },
-        action_id: "nav_my_tasks"
-      },
-      {
-        type: "button",
-        text: { type: "plain_text", text: "People" },
-        action_id: "nav_people"
-      },
-      {
-        type: "button",
-        text: { type: "plain_text", text: "📌 Pinned" },
-        action_id: "nav_pinned"
-      }
+      btn("My Tasks", "nav_my_tasks", "tasks"),
+      btn("People", "nav_people", "people"),
+      btn("📌 Pinned", "nav_pinned", "pinned")
     ]
   };
 }
@@ -164,7 +159,7 @@ function syncUsersBackground(client, teamId) {
 async function buildMyTasksView(userId, teamId) {
   let blocks = [];
 
-  blocks.push(buildNavBar());
+  blocks.push(buildNavBar('tasks'));
   blocks.push({ type: "divider" });
 
   blocks.push({
@@ -336,7 +331,7 @@ async function buildMyTasksView(userId, teamId) {
 async function buildPeopleView(userId, teamId, searchQuery = '') {
   let blocks = [];
 
-  blocks.push(buildNavBar());
+  blocks.push(buildNavBar('people'));
   blocks.push({ type: "divider" });
 
   blocks.push({
@@ -424,7 +419,7 @@ async function buildPeopleView(userId, teamId, searchQuery = '') {
 async function buildPinnedView(userId, teamId) {
   let blocks = [];
 
-  blocks.push(buildNavBar());
+  blocks.push(buildNavBar('pinned'));
   blocks.push({ type: "divider" });
 
   blocks.push({
