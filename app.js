@@ -86,6 +86,8 @@ const receiver = new ExpressReceiver({
 
 const app = new App({ receiver });
 
+receiver.router.get('/health', (_req, res) => res.status(200).send('OK'));
+
 // Helper to get team_id from body
 function getTeamId(body) {
   return body.team_id || body.team?.id || '';
