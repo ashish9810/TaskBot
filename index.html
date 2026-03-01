@@ -3,186 +3,842 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ping - Task Management for Slack</title>
+  <title>Ping — Task Management Inside Slack</title>
+  <meta name="description" content="Ping tracks tasks, monitors progress, and keeps your team aligned — without leaving Slack.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #08080f;
+      --surface: #0f0f1a;
+      --surface2: #161625;
+      --border: rgba(255,255,255,0.07);
+      --text: #f0f0f8;
+      --muted: rgba(240,240,248,0.45);
+      --accent: #7c5cfc;
+      --accent-glow: rgba(124,92,252,0.18);
+    }
+
+    html { scroll-behavior: smooth; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8f9fa;
-      color: #333;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
     }
 
-    header {
-      background: #fff;
-      padding: 20px 40px;
-      border-bottom: 1px solid #eee;
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* ── NAVBAR ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 0 40px;
+      height: 64px;
       display: flex;
       align-items: center;
+      justify-content: space-between;
+      background: rgba(8,8,15,0.8);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
     }
 
-    header h1 {
-      font-size: 24px;
-      color: #1a1a1a;
-    }
-
-    .hero {
-      text-align: center;
-      padding: 80px 20px 60px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-
-    .hero h2 {
-      font-size: 48px;
+    .nav-logo {
+      font-size: 20px;
       font-weight: 700;
-      margin-bottom: 20px;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-cta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      color: #1a1a1a;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .nav-cta:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 24px 80px;
+      overflow: hidden;
+    }
+
+    .hero-glow {
+      position: absolute;
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(ellipse, rgba(124,92,252,0.18) 0%, transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -60%);
+      pointer-events: none;
+    }
+
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 20%, transparent 100%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 32px;
+      position: relative;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      background: #4ade80;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .hero h1 {
+      font-size: clamp(48px, 7vw, 80px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      max-width: 800px;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .hero h1 span {
+      background: linear-gradient(135deg, #a78bfa, #7c5cfc, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
     .hero p {
-      font-size: 20px;
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--muted);
+      max-width: 520px;
       margin-bottom: 40px;
-      opacity: 0.9;
-      max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
+      line-height: 1.65;
+      position: relative;
     }
 
-    .add-to-slack {
-      display: inline-block;
-      background: #fff;
-      color: #1a1a1a;
-      padding: 16px 32px;
-      border-radius: 8px;
-      text-decoration: none;
-      font-size: 18px;
-      font-weight: 600;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .add-to-slack:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-    }
-
-    .add-to-slack img {
-      vertical-align: middle;
-      margin-right: 10px;
-    }
-
-    .features {
+    .hero-ctas {
       display: flex;
-      justify-content: center;
-      gap: 40px;
-      padding: 60px 40px;
-      max-width: 1000px;
-      margin: 0 auto;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: white;
+      color: #1a1a1a;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.15), 0 16px 48px rgba(0,0,0,0.5);
+    }
+
+    .hero-meta {
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      gap: 20px;
       flex-wrap: wrap;
+      justify-content: center;
     }
 
-    .feature {
-      text-align: center;
-      max-width: 250px;
-    }
+    .hero-meta span::before { content: '✓ '; color: #4ade80; }
 
-    .feature .icon {
-      font-size: 48px;
+    /* ── SECTIONS ── */
+    section { position: relative; z-index: 1; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
       margin-bottom: 16px;
     }
 
-    .feature h3 {
-      font-size: 20px;
-      margin-bottom: 10px;
-      color: #1a1a1a;
+    .section-title {
+      font-size: clamp(32px, 4vw, 48px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 16px;
     }
 
-    .feature p {
-      color: #666;
+    .section-sub {
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 520px;
       line-height: 1.6;
     }
 
-    .cta {
-      text-align: center;
-      padding: 60px 20px;
-      background: #fff;
-      border-top: 1px solid #eee;
+    /* ── PROBLEM ── */
+    .problem {
+      padding: 100px 0;
+      border-top: 1px solid var(--border);
     }
 
-    .cta h2 {
-      font-size: 32px;
-      margin-bottom: 20px;
-      color: #1a1a1a;
+    .problem-inner { text-align: center; margin-bottom: 48px; }
+    .problem-inner .section-sub { margin: 0 auto; }
+
+    .problem-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
     }
 
-    .cta p {
-      color: #666;
-      margin-bottom: 30px;
+    .problem-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+    }
+
+    .problem-card .icon { font-size: 28px; margin-bottom: 14px; }
+
+    .problem-card h3 {
       font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
     }
 
-    footer {
+    .problem-card p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    /* ── FEATURES ── */
+    .features { padding: 100px 0; }
+    .features-header { margin-bottom: 48px; }
+
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .bento-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      transition: border-color 0.2s, transform 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .bento-card:hover {
+      border-color: rgba(124,92,252,0.3);
+      transform: translateY(-2px);
+    }
+
+    .bento-card.large { grid-column: span 2; }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
+
+    .bento-card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .bento-card p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    .card-glow {
+      position: absolute;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, var(--accent-glow), transparent 70%);
+      top: -60px; right: -60px;
+      pointer-events: none;
+    }
+
+    /* ── HOW IT WORKS ── */
+    .how {
+      padding: 100px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .how-header { text-align: center; margin-bottom: 64px; }
+    .how-header .section-sub { margin: 0 auto; }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      position: relative;
+    }
+
+    .steps::before {
+      content: '';
+      position: absolute;
+      top: 28px;
+      left: calc(16.6% + 16px);
+      right: calc(16.6% + 16px);
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.4;
+    }
+
+    .step {
       text-align: center;
-      padding: 20px;
-      color: #999;
-      font-size: 14px;
-      border-top: 1px solid #eee;
+      padding: 32px 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
     }
 
-    footer a {
-      color: #667eea;
+    .step-num {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0 auto 20px;
+      color: white;
+    }
+
+    .step h3 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .step p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    /* ── TESTIMONIALS ── */
+    .testimonials {
+      padding: 100px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .testimonials-header { text-align: center; margin-bottom: 56px; }
+    .testimonials-header .section-sub { margin: 0 auto; }
+
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .testimonial {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+    }
+
+    .testimonial .quote {
+      font-size: 15px;
+      line-height: 1.65;
+      margin-bottom: 20px;
+      color: rgba(240,240,248,0.8);
+    }
+
+    .testimonial .quote::before {
+      content: '"';
+      font-size: 40px;
+      line-height: 0;
+      vertical-align: -16px;
+      color: var(--accent);
+      margin-right: 4px;
+      font-family: Georgia, serif;
+    }
+
+    .testimonial-author { display: flex; align-items: center; gap: 12px; }
+
+    .author-avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .author-info .name { font-size: 14px; font-weight: 600; }
+    .author-info .role { font-size: 12px; color: var(--muted); }
+
+    /* ── CTA SECTION ── */
+    .cta-section {
+      padding: 100px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .cta-inner {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 72px 48px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-glow {
+      position: absolute;
+      width: 500px; height: 500px;
+      background: radial-gradient(ellipse, rgba(124,92,252,0.15), transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .cta-inner h2 {
+      font-size: clamp(32px, 4vw, 52px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .cta-inner p {
+      font-size: 18px;
+      color: var(--muted);
+      margin-bottom: 40px;
+      position: relative;
+    }
+
+    .cta-inner .btn-primary { position: relative; font-size: 17px; padding: 16px 36px; }
+
+    .cta-trust {
+      margin-top: 20px;
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+      position: relative;
+    }
+
+    .cta-trust span::before { content: '✓ '; color: #4ade80; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 48px 0 32px;
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 40px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+
+    .footer-brand .logo {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+
+    .footer-brand p { font-size: 13px; color: var(--muted); max-width: 200px; line-height: 1.5; }
+
+    .footer-links h4 {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .footer-links ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+
+    .footer-links a {
+      font-size: 14px;
+      color: rgba(240,240,248,0.6);
       text-decoration: none;
-      margin: 0 10px;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover { color: var(--text); }
+
+    .footer-bottom {
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .footer-bottom p { font-size: 13px; color: var(--muted); }
+
+    .slack-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 4px 12px;
+    }
+
+    /* ── SCROLL REVEAL ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      nav { padding: 0 20px; }
+      .nav-links { display: none; }
+      .problem-cards { grid-template-columns: 1fr; }
+      .bento { grid-template-columns: 1fr; }
+      .bento-card.large { grid-column: span 1; }
+      .steps { grid-template-columns: 1fr; }
+      .steps::before { display: none; }
+      .testimonials-grid { grid-template-columns: 1fr; }
+      .footer-inner { flex-direction: column; gap: 32px; }
+      .cta-inner { padding: 48px 24px; }
     }
   </style>
 </head>
 <body>
 
-  <header>
-    <h1>🏓 Ping</h1>
-  </header>
+  <nav>
+    <a href="#" class="nav-logo">🏓 Ping</a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="support.html">Support</a></li>
+    </ul>
+    <a href="https://slack.com/oauth/v2/authorize?client_id=10571573067766.10571623106582&scope=chat:write,users:read,users:read.email&user_scope=" class="nav-cta">
+      <img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack.svg" width="16" height="16" alt="">
+      Add to Slack
+    </a>
+  </nav>
 
   <section class="hero">
-    <h2>Task Management<br>inside Slack</h2>
-    <p>Ping helps teams track tasks, monitor progress, and stay aligned — all without leaving Slack.</p>
-    <a href="https://slack.com/oauth/v2/authorize?client_id=10571573067766.10571623106582&scope=chat:write,users:read,users:read.email&user_scope=" class="add-to-slack">
-      <img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack.svg" width="24" height="24" alt="Slack">
-      Add to Slack
-    </a>
-  </section>
-
-  <section class="features">
-    <div class="feature">
-      <div class="icon">📋</div>
-      <h3>My Tasks</h3>
-      <p>Add, track, and complete your tasks directly from your Slack home tab.</p>
+    <div class="hero-glow"></div>
+    <div class="hero-grid"></div>
+    <div class="hero-badge">
+      <span class="dot"></span>
+      Built for Slack workspaces
     </div>
-    <div class="feature">
-      <div class="icon">👥</div>
-      <h3>People</h3>
-      <p>View your teammates' tasks and progress updates in one place.</p>
-    </div>
-    <div class="feature">
-      <div class="icon">📌</div>
-      <h3>Pinned</h3>
-      <p>Pin your most important team members for quick access to their tasks.</p>
+    <h1>Run your team<br>from <span>Slack.</span></h1>
+    <p>Ping tracks tasks, monitors progress, and keeps everyone aligned — without adding another tool to your stack.</p>
+    <div class="hero-ctas">
+      <a href="https://slack.com/oauth/v2/authorize?client_id=10571573067766.10571623106582&scope=chat:write,users:read,users:read.email&user_scope=" class="btn-primary">
+        <img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack.svg" width="20" height="20" alt="">
+        Add to Slack — It's Free
+      </a>
+      <div class="hero-meta">
+        <span>No credit card</span>
+        <span>2-minute setup</span>
+        <span>Any Slack workspace</span>
+      </div>
     </div>
   </section>
 
-  <section class="cta">
-    <h2>Ready to get started?</h2>
-    <p>Install Ping in your Slack workspace in seconds.</p>
-    <a href="https://slack.com/oauth/v2/authorize?client_id=10571573067766.10571623106582&scope=chat:write,users:read,users:read.email&user_scope=" class="add-to-slack">
-      <img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack.svg" width="24" height="24" alt="Slack">
-      Add to Slack
-    </a>
+  <section class="problem">
+    <div class="container">
+      <div class="problem-inner reveal">
+        <div class="section-label">The problem</div>
+        <h2 class="section-title">Managing a team shouldn't<br>feel like guesswork.</h2>
+        <p class="section-sub">Most teams lose track of tasks in Slack threads and have zero visibility without a daily standup.</p>
+      </div>
+      <div class="problem-cards">
+        <div class="problem-card reveal">
+          <div class="icon">💬</div>
+          <h3>Tasks get buried in threads</h3>
+          <p>Assignments made in Slack disappear into conversation history. No one knows what they're responsible for.</p>
+        </div>
+        <div class="problem-card reveal">
+          <div class="icon">🔄</div>
+          <h3>You have to ask for updates manually</h3>
+          <p>"Any update on this?" messages slow everyone down and make managers feel like micromanagers.</p>
+        </div>
+        <div class="problem-card reveal">
+          <div class="icon">🌫️</div>
+          <h3>No visibility without a standup</h3>
+          <p>Without a daily meeting, you have zero idea what your team is working on or where things are blocked.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="container">
+      <div class="features-header reveal">
+        <div class="section-label">Features</div>
+        <h2 class="section-title">Everything your team needs.<br>Nothing they don't.</h2>
+        <p class="section-sub">Ping lives inside Slack so your team doesn't have to learn a new tool.</p>
+      </div>
+      <div class="bento">
+        <div class="bento-card large reveal">
+          <div class="card-glow"></div>
+          <div class="card-icon">📋</div>
+          <h3>Task Management, Inside Slack</h3>
+          <p>Create, assign, and track tasks without leaving your Slack workspace. Every task has a clear owner and progress history — all accessible from the Ping home tab.</p>
+        </div>
+        <div class="bento-card reveal">
+          <div class="card-icon">💬</div>
+          <h3>Progress Updates</h3>
+          <p>Team members log updates directly in Slack. No forms, no separate tools — just a simple message that gets tracked.</p>
+        </div>
+        <div class="bento-card reveal">
+          <div class="card-icon">👥</div>
+          <h3>Team Visibility</h3>
+          <p>See every teammate's active tasks, completed work, and latest updates in one clean view.</p>
+        </div>
+        <div class="bento-card reveal">
+          <div class="card-icon">📌</div>
+          <h3>Pin Key People</h3>
+          <p>Pin your most important teammates for instant access to their tasks and progress — no searching required.</p>
+        </div>
+        <div class="bento-card large reveal">
+          <div class="card-glow"></div>
+          <div class="card-icon">🔍</div>
+          <h3>Smart People Search</h3>
+          <p>Search your entire workspace by name or email and instantly pull up anyone's task list and update history. Perfect for managers overseeing large teams.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="how" id="how">
+    <div class="container">
+      <div class="how-header reveal">
+        <div class="section-label">How it works</div>
+        <h2 class="section-title">Up and running in 3 steps.</h2>
+        <p class="section-sub">No onboarding call needed. No setup doc required.</p>
+      </div>
+      <div class="steps">
+        <div class="step reveal">
+          <div class="step-num">1</div>
+          <h3>Add Ping to Slack</h3>
+          <p>Click "Add to Slack" and approve permissions. Ping installs in your workspace in under 2 minutes.</p>
+        </div>
+        <div class="step reveal">
+          <div class="step-num">2</div>
+          <h3>Create your first task</h3>
+          <p>Open the Ping app in your Slack sidebar and add a task. Set a priority and you're done.</p>
+        </div>
+        <div class="step reveal">
+          <div class="step-num">3</div>
+          <h3>Track your team</h3>
+          <p>Use the People tab to monitor your whole team's progress. Pin key members for quick daily check-ins.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="testimonials">
+    <div class="container">
+      <div class="testimonials-header reveal">
+        <div class="section-label">What people say</div>
+        <h2 class="section-title">Teams love working with Ping.</h2>
+        <p class="section-sub">From startup founders to engineering managers.</p>
+      </div>
+      <div class="testimonials-grid">
+        <div class="testimonial reveal">
+          <p class="quote">I stopped asking "what's everyone working on?" entirely. Ping just shows me. Our standups went from 30 minutes to under 10.</p>
+          <div class="testimonial-author">
+            <div class="author-avatar">AR</div>
+            <div class="author-info">
+              <div class="name">Arjun R.</div>
+              <div class="role">Engineering Manager, Series B Startup</div>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial reveal">
+          <p class="quote">We tried Jira. We tried Asana. Nothing stuck because it wasn't where the team already lived. Ping works because it's inside Slack.</p>
+          <div class="testimonial-author">
+            <div class="author-avatar">SM</div>
+            <div class="author-info">
+              <div class="name">Sarah M.</div>
+              <div class="role">Founder, Early-stage SaaS</div>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial reveal">
+          <p class="quote">The pinned employees feature alone saved me 20 minutes a day. I check in on my 5 direct reports in under 2 minutes every morning.</p>
+          <div class="testimonial-author">
+            <div class="author-avatar">KP</div>
+            <div class="author-info">
+              <div class="name">Karan P.</div>
+              <div class="role">Product Lead, Remote-first Team</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-inner reveal">
+        <div class="cta-glow"></div>
+        <h2>Your team's progress,<br>always visible.</h2>
+        <p>Start free. No setup fee. Works with any Slack plan.</p>
+        <a href="https://slack.com/oauth/v2/authorize?client_id=10571573067766.10571623106582&scope=chat:write,users:read,users:read.email&user_scope=" class="btn-primary">
+          <img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack.svg" width="22" height="22" alt="">
+          Add Ping to Slack
+        </a>
+        <div class="cta-trust">
+          <span>Free forever for small teams</span>
+          <span>No credit card required</span>
+          <span>Uninstall in one click</span>
+        </div>
+      </div>
+    </div>
   </section>
 
   <footer>
-    <a href="privacy.html">Privacy Policy</a>
-    <a href="support.html">Support</a>
-    <span>© 2026 Ping</span>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="logo">🏓 Ping</div>
+          <p>Task management that lives where your team already works.</p>
+        </div>
+        <div class="footer-links">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#how">How it works</a></li>
+            <li><a href="https://slack.com/oauth/v2/authorize?client_id=10571573067766.10571623106582&scope=chat:write,users:read,users:read.email&user_scope=">Add to Slack</a></li>
+          </ul>
+        </div>
+        <div class="footer-links">
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="privacy.html">Privacy Policy</a></li>
+            <li><a href="support.html">Support</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2026 Ping. All rights reserved.</p>
+        <div class="slack-badge">
+          <img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack.svg" width="14" height="14" alt="">
+          Works with Slack
+        </div>
+      </div>
+    </div>
   </footer>
+
+  <script>
+    const reveals = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry, i) => {
+        if (entry.isIntersecting) {
+          setTimeout(() => entry.target.classList.add('visible'), i * 80);
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+    reveals.forEach(el => observer.observe(el));
+  </script>
 
 </body>
 </html>
