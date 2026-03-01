@@ -50,6 +50,18 @@ const receiver = new ExpressReceiver({
       }, { onConflict: 'team_id' });
 
       console.log(`✅ Installed for workspace: ${teamName} (${teamId})`);
+
+      // Send welcome DM to installer — this makes Ping appear in sidebar automatically
+      try {
+        const { WebClient } = require('@slack/web-api');
+        const client = new WebClient(installation.bot.token);
+        await client.chat.postMessage({
+          channel: installation.user.id,
+          text: `👋 *Welcome to Ping!*\n\nPing helps you track tasks and monitor your team — right inside Slack.\n\n*Get started:*\n• Open the <slack://app?team=${teamId}&id=${installation.bot.id}&tab=home|Ping Home tab> to manage tasks\n• Use *My Tasks* to see your work\n• Use *People* to assign tasks to teammates\n• Use *📌 Pinned* to track key people\n\nYou're all set! 🚀`
+        });
+      } catch (e) {
+        console.error('Welcome DM failed:', e.message);
+      }
     },
     fetchInstallation: async (installQuery) => {
       const teamId = installQuery.isEnterpriseInstall
