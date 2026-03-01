@@ -21,6 +21,9 @@ const receiver = new ExpressReceiver({
   clientId: process.env.SLACK_CLIENT_ID,
   clientSecret: process.env.SLACK_CLIENT_SECRET,
   stateSecret: process.env.SLACK_STATE_SECRET,
+  installerOptions: {
+    stateVerification: false,
+  },
   scopes: [
     'app_mentions:read',
     'channels:read',
