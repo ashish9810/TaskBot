@@ -51,10 +51,14 @@ const receiver = new ExpressReceiver({
 
       console.log(`✅ Installed for workspace: ${teamName} (${teamId})`);
 
-      // Send welcome DM to installer — this makes Ping appear in sidebar automatically
+      // Send welcome DM and sync users on install
       try {
         const { WebClient } = require('@slack/web-api');
         const client = new WebClient(installation.bot.token);
+
+        // Sync all workspace users immediately on install
+        await syncUsers(client, teamId);
+
         await client.chat.postMessage({
           channel: installation.user.id,
           text: `👋 *Welcome to Ping!*\n\nPing helps you track tasks and monitor your team — right inside Slack.\n\n*Get started:*\n• Open the <slack://app?team=${teamId}&id=${installation.bot.id}&tab=home|Ping Home tab> to manage tasks\n• Use *My Tasks* to see your work\n• Use *People* to assign tasks to teammates\n• Use *📌 Pinned* to track key people\n\nYou're all set! 🚀`
@@ -631,7 +635,17 @@ async function publishHome(client, userId, teamId, mode = 'my_tasks', searchQuer
 
 app.event('app_home_opened', async ({ event, client, body }) => {
   const teamId = getTeamId(body);
-  syncUsersBackground(client, teamId);
+
+  // Only sync if this user is not yet in the database (avoids rate limiting)
+  const { data: existingUser } = await supabase
+    .from('users')
+    .select('slack_user_id')
+    .eq('slack_user_id', event.user)
+    .eq('team_id', teamId)
+    .single();
+
+  if (!existingUser) syncUsersBackground(client, teamId);
+
   await publishHome(client, event.user, teamId, 'my_tasks');
 });
 
