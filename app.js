@@ -64,7 +64,7 @@ const receiver = new ExpressReceiver({
           text: `👋 *Welcome to Ping!*\n\nPing helps you track tasks and monitor your team — right inside Slack.\n\n*Get started:*\n• Open the <slack://app?team=${teamId}&id=${installation.bot.id}&tab=home|Ping Home tab> to manage tasks\n• Use *My Tasks* to see your work\n• Use *People* to assign tasks to teammates\n• Use *📌 Pinned* to track key people\n\nYou're all set! 🚀`
         });
       } catch (e) {
-        console.error('Welcome DM failed:', e.message);
+        console.error('Install setup failed:', e.message, e.stack);
       }
     },
     fetchInstallation: async (installQuery) => {
