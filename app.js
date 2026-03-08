@@ -107,6 +107,24 @@ const app = new App({ receiver });
 
 receiver.router.get('/health', (_req, res) => res.status(200).send('OK'));
 
+receiver.router.get('/sync-users', async (req, res) => {
+  const secret = req.query.secret;
+  if (secret !== process.env.SYNC_SECRET) {
+    return res.status(401).send('Unauthorized');
+  }
+
+  const { data: installations, error } = await supabase.from('installations').select('team_id, bot_token, team_name');
+  if (error) return res.status(500).send('Failed to fetch installations: ' + error.message);
+
+  res.json({ message: `Syncing ${installations.length} workspace(s) in background...`, workspaces: installations.map(i => i.team_name) });
+
+  const { WebClient } = require('@slack/web-api');
+  for (const install of installations) {
+    const client = new WebClient(install.bot_token);
+    syncUsersBackground(client, install.team_id);
+  }
+});
+
 // Helper to get team_id from body
 function getTeamId(body) {
   return body.team_id || body.team?.id || '';
@@ -354,7 +372,9 @@ async function buildMyTasksView(userId, teamId) {
 }
 
 
-async function buildPeopleView(userId, teamId, searchQuery = '') {
+const PEOPLE_PAGE_SIZE = 20;
+
+async function buildPeopleView(userId, teamId, searchQuery = '', page = 0) {
   let blocks = [];
 
   blocks.push(buildNavBar('people'));
@@ -406,7 +426,16 @@ async function buildPeopleView(userId, teamId, searchQuery = '') {
     return blocks;
   }
 
-  for (const user of filtered) {
+  const totalPages = Math.ceil(filtered.length / PEOPLE_PAGE_SIZE);
+  const currentPage = Math.min(page, totalPages - 1);
+  const paginated = filtered.slice(currentPage * PEOPLE_PAGE_SIZE, (currentPage + 1) * PEOPLE_PAGE_SIZE);
+
+  blocks.push({
+    type: "section",
+    text: { type: "mrkdwn", text: `_Showing ${currentPage * PEOPLE_PAGE_SIZE + 1}–${Math.min((currentPage + 1) * PEOPLE_PAGE_SIZE, filtered.length)} of ${filtered.length} people_` }
+  });
+
+  for (const user of paginated) {
     const isPinned = pinnedIds.has(user.slack_user_id);
 
     blocks.push({
@@ -436,6 +465,28 @@ async function buildPeopleView(userId, teamId, searchQuery = '') {
     });
 
     blocks.push({ type: "divider" });
+  }
+
+  // Pagination buttons
+  const navElements = [];
+  if (currentPage > 0) {
+    navElements.push({
+      type: "button",
+      text: { type: "plain_text", text: "← Prev" },
+      value: `${currentPage - 1}:${searchQuery}`,
+      action_id: "people_prev_page"
+    });
+  }
+  if (currentPage < totalPages - 1) {
+    navElements.push({
+      type: "button",
+      text: { type: "plain_text", text: "Next →" },
+      value: `${currentPage + 1}:${searchQuery}`,
+      action_id: "people_next_page"
+    });
+  }
+  if (navElements.length > 0) {
+    blocks.push({ type: "actions", elements: navElements });
   }
 
   return blocks;
@@ -621,11 +672,11 @@ async function buildPersonTasksBlocks(targetUserId, teamId) {
 // PUBLISH HOME
 // =============================
 
-async function publishHome(client, userId, teamId, mode = 'my_tasks', searchQuery = '') {
+async function publishHome(client, userId, teamId, mode = 'my_tasks', searchQuery = '', page = 0) {
   let blocks;
 
   if (mode === 'people') {
-    blocks = await buildPeopleView(userId, teamId, searchQuery);
+    blocks = await buildPeopleView(userId, teamId, searchQuery, page);
   } else if (mode === 'pinned') {
     blocks = await buildPinnedView(userId, teamId);
   } else {
@@ -930,7 +981,21 @@ app.action('delete_task', async ({ ack, body, client }) => {
 app.action('people_search', async ({ ack, body, client }) => {
   await ack();
   const searchQuery = body.actions[0].value || '';
-  await publishHome(client, body.user.id, getTeamId(body), 'people', searchQuery);
+  await publishHome(client, body.user.id, getTeamId(body), 'people', searchQuery, 0);
+});
+
+app.action('people_prev_page', async ({ ack, body, client }) => {
+  await ack();
+  const [pageStr, ...rest] = (body.actions[0].value || '0:').split(':');
+  const searchQuery = rest.join(':');
+  await publishHome(client, body.user.id, getTeamId(body), 'people', searchQuery, parseInt(pageStr));
+});
+
+app.action('people_next_page', async ({ ack, body, client }) => {
+  await ack();
+  const [pageStr, ...rest] = (body.actions[0].value || '0:').split(':');
+  const searchQuery = rest.join(':');
+  await publishHome(client, body.user.id, getTeamId(body), 'people', searchQuery, parseInt(pageStr));
 });
 
 
