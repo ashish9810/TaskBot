@@ -936,7 +936,7 @@ app.action('back_to_person_tasks', async ({ ack, body, client }) => {
     buildPersonTasksBlocks(targetUserId, teamId)
   ]);
 
-  const name = (targetUser?.name || 'User').substring(0, 15);
+  const name = (targetUser?.name || 'User').split(' ')[0];
 
   await client.views.update({
     view_id: body.view.id,
@@ -1043,7 +1043,7 @@ app.action('view_person_tasks', async ({ ack, body, client }) => {
       buildPersonTasksBlocks(targetUserId, teamId)
     ]);
 
-    const name = (targetUser?.name || 'User').substring(0, 15);
+    const name = (targetUser?.name || 'User').split(' ')[0];
 
     await client.views.update({
       view_id: viewId,
@@ -1146,7 +1146,7 @@ app.action('view_pinned_tasks', async ({ ack, body, client }) => {
       buildPersonTasksBlocks(targetUserId, teamId)
     ]);
 
-    const name = (targetUser?.name || 'User').substring(0, 15);
+    const name = (targetUser?.name || 'User').split(' ')[0];
 
     await client.views.update({
       view_id: viewId,
