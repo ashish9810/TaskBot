@@ -51,20 +51,20 @@ const receiver = new ExpressReceiver({
 
       console.log(`✅ Installed for workspace: ${teamName} (${teamId})`);
 
-      // Send welcome DM and sync users on install
+      const { WebClient } = require('@slack/web-api');
+      const client = new WebClient(installation.bot.token);
+
+      // Sync all workspace users in background (avoids rate-limit timeout blocking install)
+      syncUsersBackground(client, teamId);
+
+      // Send welcome DM (optional — ignore if messages tab is disabled)
       try {
-        const { WebClient } = require('@slack/web-api');
-        const client = new WebClient(installation.bot.token);
-
-        // Sync all workspace users immediately on install
-        await syncUsers(client, teamId);
-
         await client.chat.postMessage({
           channel: installation.user.id,
           text: `👋 *Welcome to Ping!*\n\nPing helps you track tasks and monitor your team — right inside Slack.\n\n*Get started:*\n• Open the <slack://app?team=${teamId}&id=${installation.bot.id}&tab=home|Ping Home tab> to manage tasks\n• Use *My Tasks* to see your work\n• Use *People* to assign tasks to teammates\n• Use *📌 Pinned* to track key people\n\nYou're all set! 🚀`
         });
       } catch (e) {
-        console.error('Install setup failed:', e.message, e.stack);
+        console.error('Welcome DM failed (non-fatal):', e.message);
       }
     },
     fetchInstallation: async (installQuery) => {
@@ -148,17 +148,27 @@ function buildNavBar(activeMode) {
 
 async function syncUsers(client, teamId) {
   const result = await client.users.list();
+  console.log(`[syncUsers] Fetched ${result.members?.length ?? 0} members for team ${teamId}`);
 
+  let synced = 0, skipped = 0, errors = 0;
   for (const member of result.members) {
-    if (member.is_bot || member.deleted) continue;
+    if (member.is_bot || member.deleted) { skipped++; continue; }
 
-    await supabase.from('users').upsert({
+    const { error } = await supabase.from('users').upsert({
       slack_user_id: member.id,
       team_id: teamId,
       name: member.real_name,
       email: member.profile.email
     }, { onConflict: 'slack_user_id,team_id' });
+
+    if (error) {
+      console.error(`[syncUsers] upsert failed for ${member.id}:`, error.message, error.details, error.hint);
+      errors++;
+    } else {
+      synced++;
+    }
   }
+  console.log(`[syncUsers] Done — synced: ${synced}, skipped (bots/deleted): ${skipped}, errors: ${errors}`);
 }
 
 function syncUsersBackground(client, teamId) {
