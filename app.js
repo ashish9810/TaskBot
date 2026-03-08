@@ -1009,6 +1009,17 @@ app.action('view_person_tasks', async ({ ack, body, client }) => {
   const targetUserId = body.actions[0].value;
   const teamId = getTeamId(body);
 
+  // Open modal immediately before any async work so trigger_id doesn't expire
+  const { view } = await client.views.open({
+    trigger_id: body.trigger_id,
+    view: {
+      type: "modal",
+      title: { type: "plain_text", text: "Loading..." },
+      close: { type: "plain_text", text: "Close" },
+      blocks: [{ type: "section", text: { type: "mrkdwn", text: "_Loading tasks..._" } }]
+    }
+  });
+
   const [
     { data: targetUser },
     taskBlocks
@@ -1019,8 +1030,8 @@ app.action('view_person_tasks', async ({ ack, body, client }) => {
 
   const name = (targetUser?.name || 'User').substring(0, 18);
 
-  await client.views.open({
-    trigger_id: body.trigger_id,
+  await client.views.update({
+    view_id: view.id,
     view: {
       type: "modal",
       title: { type: "plain_text", text: `${name}'s Tasks` },
