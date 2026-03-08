@@ -699,6 +699,99 @@ async function publishHome(client, userId, teamId, mode = 'my_tasks', searchQuer
 
 
 // =============================
+// APP MENTION — assign task via @Ping
+// Usage: @Ping assign @John fix the login bug
+// =============================
+
+app.event('app_mention', async ({ event, client, body }) => {
+  const teamId = getTeamId(body);
+
+  // Strip the bot mention from the text
+  const text = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
+
+  // Must start with "assign"
+  if (!/^assign\b/i.test(text)) {
+    await client.chat.postMessage({
+      channel: event.channel,
+      thread_ts: event.ts,
+      text: `Hi <@${event.user}>! To assign a task, use:\n*@Ping assign @person task description*\n\nExample: _@Ping assign @Sarah fix the login bug_`
+    });
+    return;
+  }
+
+  // Extract mentioned user(s) from the original event text
+  // event.text looks like: "<@BOTID> assign <@USERID> task title"
+  const mentionMatches = event.text.match(/<@([A-Z0-9]+)>/g) || [];
+  // First mention is the bot itself, second is the assignee
+  const assigneeMention = mentionMatches[1];
+  if (!assigneeMention) {
+    await client.chat.postMessage({
+      channel: event.channel,
+      thread_ts: event.ts,
+      text: `Please mention who to assign the task to.\nExample: _@Ping assign @Sarah fix the login bug_`
+    });
+    return;
+  }
+
+  const assigneeSlackId = assigneeMention.replace(/<@|>/g, '');
+
+  // Extract task title: everything after "assign @mention"
+  const taskTitle = event.text
+    .replace(/<@[A-Z0-9]+>/g, '')  // remove all mentions
+    .replace(/^assign\s*/i, '')     // remove "assign"
+    .trim();
+
+  if (!taskTitle) {
+    await client.chat.postMessage({
+      channel: event.channel,
+      thread_ts: event.ts,
+      text: `Please include a task description.\nExample: _@Ping assign @Sarah fix the login bug_`
+    });
+    return;
+  }
+
+  // Look up assignee in users table
+  const { data: assignee } = await supabase
+    .from('users')
+    .select('slack_user_id, name')
+    .eq('slack_user_id', assigneeSlackId)
+    .eq('team_id', teamId)
+    .single();
+
+  // If not in table yet, sync them first
+  if (!assignee) {
+    syncUsersBackground(client, teamId);
+  }
+
+  // Create the task
+  const { error } = await supabase.from('tasks').insert({
+    title: taskTitle,
+    user_id: assigneeSlackId,
+    team_id: teamId,
+    status: 'active'
+  });
+
+  if (error) {
+    console.error('[app_mention] Failed to create task:', error.message);
+    await client.chat.postMessage({
+      channel: event.channel,
+      thread_ts: event.ts,
+      text: `Sorry, something went wrong. Please try again.`
+    });
+    return;
+  }
+
+  const assigneeName = assignee?.name?.split(' ')[0] || `<@${assigneeSlackId}>`;
+
+  await client.chat.postMessage({
+    channel: event.channel,
+    thread_ts: event.ts,
+    text: `✅ Task assigned to ${assigneeName}:\n*${taskTitle}*`
+  });
+});
+
+
+// =============================
 // HOME EVENT
 // =============================
 
