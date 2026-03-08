@@ -1010,7 +1010,7 @@ app.action('view_person_tasks', async ({ ack, body, client }) => {
   const teamId = getTeamId(body);
 
   // Open modal immediately before any async work so trigger_id doesn't expire
-  const { view } = await client.views.open({
+  const openResult = await client.views.open({
     trigger_id: body.trigger_id,
     view: {
       type: "modal",
@@ -1020,26 +1020,45 @@ app.action('view_person_tasks', async ({ ack, body, client }) => {
     }
   });
 
-  const [
-    { data: targetUser },
-    taskBlocks
-  ] = await Promise.all([
-    supabase.from('users').select('name').eq('slack_user_id', targetUserId).eq('team_id', teamId).single(),
-    buildPersonTasksBlocks(targetUserId, teamId)
-  ]);
+  const viewId = openResult?.view?.id;
+  if (!viewId) {
+    console.error('[view_person_tasks] Failed to open modal — no view ID returned');
+    return;
+  }
 
-  const name = (targetUser?.name || 'User').substring(0, 18);
+  try {
+    const [
+      { data: targetUser },
+      taskBlocks
+    ] = await Promise.all([
+      supabase.from('users').select('name').eq('slack_user_id', targetUserId).eq('team_id', teamId).single(),
+      buildPersonTasksBlocks(targetUserId, teamId)
+    ]);
 
-  await client.views.update({
-    view_id: view.id,
-    view: {
-      type: "modal",
-      title: { type: "plain_text", text: `${name}'s Tasks` },
-      close: { type: "plain_text", text: "Close" },
-      private_metadata: JSON.stringify({ targetUserId, teamId }),
-      blocks: taskBlocks
-    }
-  });
+    const name = (targetUser?.name || 'User').substring(0, 18);
+
+    await client.views.update({
+      view_id: viewId,
+      view: {
+        type: "modal",
+        title: { type: "plain_text", text: `${name}'s Tasks` },
+        close: { type: "plain_text", text: "Close" },
+        private_metadata: JSON.stringify({ targetUserId, teamId }),
+        blocks: taskBlocks
+      }
+    });
+  } catch (err) {
+    console.error('[view_person_tasks] Failed to load tasks:', err);
+    await client.views.update({
+      view_id: viewId,
+      view: {
+        type: "modal",
+        title: { type: "plain_text", text: "Error" },
+        close: { type: "plain_text", text: "Close" },
+        blocks: [{ type: "section", text: { type: "mrkdwn", text: "_Failed to load tasks. Please try again._" } }]
+      }
+    }).catch(() => {});
+  }
 });
 
 
@@ -1093,26 +1112,56 @@ app.action('view_pinned_tasks', async ({ ack, body, client }) => {
   const targetUserId = body.actions[0].value;
   const teamId = getTeamId(body);
 
-  const [
-    { data: targetUser },
-    taskBlocks
-  ] = await Promise.all([
-    supabase.from('users').select('name').eq('slack_user_id', targetUserId).eq('team_id', teamId).single(),
-    buildPersonTasksBlocks(targetUserId, teamId)
-  ]);
-
-  const name = (targetUser?.name || 'User').substring(0, 18);
-
-  await client.views.open({
+  // Open modal immediately before any async work so trigger_id doesn't expire
+  const openResult = await client.views.open({
     trigger_id: body.trigger_id,
     view: {
       type: "modal",
-      title: { type: "plain_text", text: `${name}'s Tasks` },
+      title: { type: "plain_text", text: "Loading..." },
       close: { type: "plain_text", text: "Close" },
-      private_metadata: JSON.stringify({ targetUserId, teamId }),
-      blocks: taskBlocks
+      blocks: [{ type: "section", text: { type: "mrkdwn", text: "_Loading tasks..._" } }]
     }
   });
+
+  const viewId = openResult?.view?.id;
+  if (!viewId) {
+    console.error('[view_pinned_tasks] Failed to open modal — no view ID returned');
+    return;
+  }
+
+  try {
+    const [
+      { data: targetUser },
+      taskBlocks
+    ] = await Promise.all([
+      supabase.from('users').select('name').eq('slack_user_id', targetUserId).eq('team_id', teamId).single(),
+      buildPersonTasksBlocks(targetUserId, teamId)
+    ]);
+
+    const name = (targetUser?.name || 'User').substring(0, 18);
+
+    await client.views.update({
+      view_id: viewId,
+      view: {
+        type: "modal",
+        title: { type: "plain_text", text: `${name}'s Tasks` },
+        close: { type: "plain_text", text: "Close" },
+        private_metadata: JSON.stringify({ targetUserId, teamId }),
+        blocks: taskBlocks
+      }
+    });
+  } catch (err) {
+    console.error('[view_pinned_tasks] Failed to load tasks:', err);
+    await client.views.update({
+      view_id: viewId,
+      view: {
+        type: "modal",
+        title: { type: "plain_text", text: "Error" },
+        close: { type: "plain_text", text: "Close" },
+        blocks: [{ type: "section", text: { type: "mrkdwn", text: "_Failed to load tasks. Please try again._" } }]
+      }
+    }).catch(() => {});
+  }
 });
 
 
