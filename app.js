@@ -165,18 +165,26 @@ function buildNavBar(activeMode) {
 // =============================
 
 async function syncUsers(client, teamId) {
-  const result = await client.users.list();
-  console.log(`[syncUsers] Fetched ${result.members?.length ?? 0} members for team ${teamId}`);
+  let allMembers = [];
+  let cursor;
+
+  do {
+    const result = await client.users.list({ limit: 200, ...(cursor ? { cursor } : {}) });
+    allMembers = allMembers.concat(result.members || []);
+    cursor = result.response_metadata?.next_cursor;
+  } while (cursor);
+
+  console.log(`[syncUsers] Fetched ${allMembers.length} members for team ${teamId}`);
 
   let synced = 0, skipped = 0, errors = 0;
-  for (const member of result.members) {
-    if (member.is_bot || member.deleted) { skipped++; continue; }
+  for (const member of allMembers) {
+    if (member.is_bot || member.deleted || !member.profile) { skipped++; continue; }
 
     const { error } = await supabase.from('users').upsert({
       slack_user_id: member.id,
       team_id: teamId,
-      name: member.real_name,
-      email: member.profile.email
+      name: member.real_name || member.profile.display_name || member.name,
+      email: member.profile.email || null
     }, { onConflict: 'slack_user_id,team_id' });
 
     if (error) {
@@ -601,7 +609,7 @@ async function buildPersonTasksBlocks(targetUserId, teamId) {
       blocks.push({
         type: "section",
         fields: [
-          { type: "mrkdwn", text: `*${task.title}*` },
+          { type: "mrkdwn", text: `*${task.title || '(untitled)'}*` },
           { type: "mrkdwn", text: `📅 Created: ${formatDate(task.created_at)}` }
         ]
       });
@@ -641,7 +649,7 @@ async function buildPersonTasksBlocks(targetUserId, teamId) {
       blocks.push({
         type: "section",
         fields: [
-          { type: "mrkdwn", text: `*${task.title}*` },
+          { type: "mrkdwn", text: `*${task.title || '(untitled)'}*` },
           { type: "mrkdwn", text: `🏁 Completed: ${formatDate(task.completed_at)}` }
         ]
       });
@@ -928,7 +936,7 @@ app.action('back_to_person_tasks', async ({ ack, body, client }) => {
     buildPersonTasksBlocks(targetUserId, teamId)
   ]);
 
-  const name = (targetUser?.name || 'User').substring(0, 18);
+  const name = (targetUser?.name || 'User').substring(0, 15);
 
   await client.views.update({
     view_id: body.view.id,
@@ -1035,7 +1043,7 @@ app.action('view_person_tasks', async ({ ack, body, client }) => {
       buildPersonTasksBlocks(targetUserId, teamId)
     ]);
 
-    const name = (targetUser?.name || 'User').substring(0, 18);
+    const name = (targetUser?.name || 'User').substring(0, 15);
 
     await client.views.update({
       view_id: viewId,
@@ -1044,11 +1052,11 @@ app.action('view_person_tasks', async ({ ack, body, client }) => {
         title: { type: "plain_text", text: `${name}'s Tasks` },
         close: { type: "plain_text", text: "Close" },
         private_metadata: JSON.stringify({ targetUserId, teamId }),
-        blocks: taskBlocks
+        blocks: taskBlocks.slice(0, 100)
       }
     });
   } catch (err) {
-    console.error('[view_person_tasks] Failed to load tasks:', err);
+    console.error('[view_person_tasks] Failed to load tasks:', err?.message || err, err?.data || '');
     await client.views.update({
       view_id: viewId,
       view: {
@@ -1138,7 +1146,7 @@ app.action('view_pinned_tasks', async ({ ack, body, client }) => {
       buildPersonTasksBlocks(targetUserId, teamId)
     ]);
 
-    const name = (targetUser?.name || 'User').substring(0, 18);
+    const name = (targetUser?.name || 'User').substring(0, 15);
 
     await client.views.update({
       view_id: viewId,
@@ -1147,11 +1155,11 @@ app.action('view_pinned_tasks', async ({ ack, body, client }) => {
         title: { type: "plain_text", text: `${name}'s Tasks` },
         close: { type: "plain_text", text: "Close" },
         private_metadata: JSON.stringify({ targetUserId, teamId }),
-        blocks: taskBlocks
+        blocks: taskBlocks.slice(0, 100)
       }
     });
   } catch (err) {
-    console.error('[view_pinned_tasks] Failed to load tasks:', err);
+    console.error('[view_pinned_tasks] Failed to load tasks:', err?.message || err, err?.data || '');
     await client.views.update({
       view_id: viewId,
       view: {
