@@ -81,6 +81,17 @@
 
     .nav-links a:hover { color: var(--text); }
 
+    .nav-signin {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+      margin-right: 8px;
+    }
+
+    .nav-signin:hover { color: var(--text); }
+
     .nav-cta {
       display: flex;
       align-items: center;
@@ -211,6 +222,17 @@
       transform: translateY(-2px);
       box-shadow: 0 0 0 1px rgba(255,255,255,0.15), 0 16px 48px rgba(0,0,0,0.5);
     }
+
+    .btn-secondary {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+      letter-spacing: -0.01em;
+    }
+
+    .btn-secondary:hover { color: var(--text); }
 
     .hero-meta {
       font-size: 13px;
@@ -614,6 +636,7 @@
       <li><a href="#how">How it works</a></li>
       <li><a href="support.html">Support</a></li>
     </ul>
+    <a href="/login" class="nav-signin">Sign in</a>
     <a href="https://slack.com/oauth/v2/authorize?client_id=10571573067766.10571623106582&scope=chat:write,users:read,users:read.email&user_scope=" class="nav-cta">
       <img src="slack_logo.png" width="16" height="16" alt="Slack" style="vertical-align:middle;">
       Add to Slack
@@ -625,7 +648,7 @@
     <div class="hero-grid"></div>
     <div class="hero-badge">
       <span class="dot"></span>
-      Built for Slack workspaces
+      Works with Slack · Web app coming soon
     </div>
     <h1>Run your team<br>from <span>Slack.</span></h1>
     <p>Ping tracks tasks, monitors progress, and keeps everyone aligned — without adding another tool to your stack.</p>
@@ -634,6 +657,7 @@
         <img src="slack_logo.png" width="20" height="20" alt="Slack" style="vertical-align:middle;">
         Add to Slack — It's Free
       </a>
+      <a href="/signup" class="btn-secondary">Or sign up with email →</a>
       <div class="hero-meta">
         <span>No credit card</span>
         <span>2-minute setup</span>
@@ -708,6 +732,12 @@
           <div class="card-icon">✅</div>
           <h3>Track Completed Work</h3>
           <p>See a full history of completed and deleted tasks. Nothing gets lost — every action is recorded.</p>
+        </div>
+        <div class="bento-card reveal">
+          <div class="card-glow"></div>
+          <div class="card-icon">🌐</div>
+          <h3>Web Dashboard <span style="font-size:0.65em;opacity:0.45;font-weight:500">(Coming Soon)</span></h3>
+          <p>Access your tasks and team view from any browser — no Slack required. <a href="/signup" style="color:var(--accent);text-decoration:none;">Sign up for early access →</a></p>
         </div>
       </div>
     </div>
@@ -814,6 +844,7 @@
             <li><a href="#features">Features</a></li>
             <li><a href="#how">How it works</a></li>
             <li><a href="https://slack.com/oauth/v2/authorize?client_id=10571573067766.10571623106582&scope=chat:write,users:read,users:read.email&user_scope=">Add to Slack</a></li>
+            <li><a href="/signup">Web App (Early Access)</a></li>
           </ul>
         </div>
         <div class="footer-links">

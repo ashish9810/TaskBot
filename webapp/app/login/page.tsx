@@ -1,0 +1,282 @@
+'use client'
+
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase-browser'
+import { syncSlackIdentity } from '@/lib/sync'
+
+function LoginForm() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const message = searchParams.get('message')
+  const errorParam = searchParams.get('error')
+  const nextUrl = searchParams.get('next') || '/dashboard'
+
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({})
+  const [loading, setLoading] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [resendEmail, setResendEmail] = useState('')
+
+  // Map URL error params to user-friendly messages
+  const urlError =
+    errorParam === 'auth_failed'
+      ? 'That sign-in link has expired or is invalid. Please try signing in again.'
+      : errorParam === 'reset_link_invalid'
+      ? 'That password reset link has expired or already been used. Request a new one below.'
+      : null
+
+  function validate() {
+    const e: typeof errors = {}
+    if (!email.trim()) e.email = 'Please enter your email address.'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "That doesn't look like a valid email."
+    if (!password) e.password = 'Please enter your password.'
+    return e
+  }
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    const errs = validate()
+    if (Object.keys(errs).length) { setErrors(errs); return }
+    setErrors({})
+    setLoading(true)
+
+    const supabase = createClient()
+
+    try {
+      // Check if this email has an account before attempting login
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email.toLowerCase().trim())
+        .maybeSingle()
+
+      if (!profile) {
+        setLoading(false)
+        setErrors({
+          email: "We don't have an account with this email. Want to create one?",
+          general: 'no-account',
+        })
+        return
+      }
+
+      // Account exists — attempt login
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+      if (error) {
+        setLoading(false)
+        const msg = error.message.toLowerCase()
+        if (msg.includes('email not confirmed')) {
+          setResendEmail(email)
+          setErrors({ general: 'unconfirmed' })
+        } else if (msg.includes('too many requests') || msg.includes('rate limit')) {
+          setErrors({ general: 'Too many attempts. Please wait a minute and try again.' })
+        } else {
+          setErrors({ password: "That password isn't correct for this account. Try again or reset your password." })
+        }
+        return
+      }
+
+      if (data.user) {
+        await syncSlackIdentity(supabase, data.user.id, data.user.email!)
+      }
+      router.push(nextUrl)
+      router.refresh()
+    } catch {
+      setLoading(false)
+      setErrors({ general: 'Network error. Check your internet connection and try again.' })
+    }
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      setErrors({ email: 'Enter your email above first, then click "Forgot password?".' })
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrors({ email: "That doesn't look like a valid email." })
+      return
+    }
+
+    const supabase = createClient()
+
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email.toLowerCase().trim())
+        .maybeSingle()
+
+      if (!profile) {
+        setErrors({
+          email: "We don't have an account with this email. Want to create one?",
+          general: 'no-account',
+        })
+        return
+      }
+
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+      })
+      router.push(`/login?message=We've sent a password reset link to ${email}. Check your inbox (and spam folder).`)
+    } catch {
+      setErrors({ general: 'Network error. Check your internet connection and try again.' })
+    }
+  }
+
+  async function handleResendConfirmation() {
+    if (resendCooldown > 0) return
+    const supabase = createClient()
+    await supabase.auth.resend({ type: 'signup', email: resendEmail })
+    setResendCooldown(60)
+    const interval = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) { clearInterval(interval); return 0 }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  return (
+    <div style={s.page}>
+      <div style={s.card}>
+        <div style={s.logoRow}><span style={s.logo}>Ping</span></div>
+        <h1 style={s.title}>Welcome back</h1>
+        <p style={s.subtitle}>Sign in to your account</p>
+
+        {urlError && (
+          <div style={s.errBox}>
+            <span>⚠️</span>
+            <span>{urlError}</span>
+          </div>
+        )}
+
+        {message && (
+          <div style={s.infoBox}>
+            <span>✉️</span>
+            <span>{message}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleLogin} style={s.form} noValidate>
+          <div style={s.field}>
+            <label style={s.label}>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setErrors(p => ({ ...p, email: undefined, general: undefined })) }}
+              placeholder="you@company.com"
+              style={{ ...s.input, ...(errors.email ? s.inputErr : {}) }}
+              autoComplete="email"
+              autoFocus
+            />
+            {errors.email && <p style={s.fieldErr}>{errors.email}</p>}
+          </div>
+
+          <div style={s.field}>
+            <div style={s.labelRow}>
+              <label style={s.label}>Password</label>
+              <button type="button" onClick={handleForgotPassword} style={s.forgotBtn}>Forgot password?</button>
+            </div>
+            <div style={s.pwWrap}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => { setPassword(e.target.value); setErrors(p => ({ ...p, password: undefined, general: undefined })) }}
+                placeholder="••••••••"
+                style={{ ...s.input, paddingRight: '44px', ...(errors.password ? s.inputErr : {}) }}
+                autoComplete="current-password"
+              />
+              <button type="button" onClick={() => setShowPassword(v => !v)} style={s.eyeBtn} tabIndex={-1}>
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
+            {errors.password && <p style={s.fieldErr}>{errors.password}</p>}
+          </div>
+
+          {errors.general && errors.general !== 'no-account' && errors.general !== 'unconfirmed' && (
+            <div style={s.errBox}>
+              <span>⚠️</span>
+              <span>{errors.general}</span>
+            </div>
+          )}
+
+          {errors.general === 'unconfirmed' && (
+            <div style={s.infoBox}>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', width: '100%' }}>
+                <span>You haven&apos;t verified your email yet. Check your inbox for the confirmation link we sent when you signed up.</span>
+                <button
+                  type="button"
+                  onClick={handleResendConfirmation}
+                  disabled={resendCooldown > 0}
+                  style={{ ...s.resendBtn, ...(resendCooldown > 0 ? s.resendBtnDisabled : {}) }}
+                >
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend confirmation email'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {errors.general === 'no-account' && (
+            <div style={s.noAccountBox}>
+              <p style={s.noAccountText}>No account found with this email.</p>
+              <Link href={`/signup?email=${encodeURIComponent(email)}`} style={s.signupCta}>
+                Create a free account →
+              </Link>
+            </div>
+          )}
+
+          <button type="submit" disabled={loading} style={{ ...s.btn, ...(loading ? s.btnDisabled : {}) }}>
+            {loading
+              ? <span style={s.btnInner}><span style={s.spinner} />Signing in…</span>
+              : 'Sign in'}
+          </button>
+        </form>
+
+        <p style={s.switchText}>
+          Don&apos;t have an account?{' '}
+          <Link href="/signup" style={s.link}>Create one free</Link>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+export default function LoginPage() {
+  return <Suspense><LoginForm /></Suspense>
+}
+
+const s: Record<string, React.CSSProperties> = {
+  page: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '24px' },
+  card: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '18px', padding: '40px', width: '100%', maxWidth: '400px' },
+  logoRow: { marginBottom: '28px' },
+  logo: { fontSize: '18px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)' },
+  title: { fontSize: '22px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)', marginBottom: '4px' },
+  subtitle: { fontSize: '14px', color: 'var(--muted)', marginBottom: '28px' },
+  form: { display: 'flex', flexDirection: 'column', gap: '18px' },
+  field: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  labelRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  label: { fontSize: '13px', fontWeight: 500, color: 'var(--muted)' },
+  forgotBtn: { background: 'none', border: 'none', color: 'var(--accent)', fontSize: '12px', cursor: 'pointer', padding: 0, fontFamily: 'inherit' },
+  input: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text)', outline: 'none', width: '100%', transition: 'border-color 0.2s', fontFamily: 'inherit' },
+  inputErr: { borderColor: 'rgba(248,113,113,0.6)' },
+  pwWrap: { position: 'relative' },
+  eyeBtn: { position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '15px', padding: 0, lineHeight: 1 },
+  fieldErr: { fontSize: '12px', color: '#f87171', marginTop: '2px' },
+  errBox: { display: 'flex', gap: '10px', alignItems: 'flex-start', fontSize: '13px', color: '#fca5a5', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: '8px', padding: '12px 14px', lineHeight: 1.5 },
+  infoBox: { display: 'flex', gap: '10px', alignItems: 'flex-start', fontSize: '13px', color: 'rgba(240,240,248,0.85)', background: 'rgba(124,92,252,0.08)', border: '1px solid rgba(124,92,252,0.25)', borderRadius: '8px', padding: '12px 14px', marginBottom: '4px', lineHeight: 1.5 },
+  btn: { background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '15px', fontWeight: 600, cursor: 'pointer', marginTop: '4px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  btnDisabled: { opacity: 0.65, cursor: 'not-allowed' },
+  btnInner: { display: 'flex', alignItems: 'center', gap: '8px' },
+  spinner: { display: 'inline-block', width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 },
+  switchText: { marginTop: '24px', textAlign: 'center', fontSize: '14px', color: 'var(--muted)' },
+  link: { color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 },
+  noAccountBox: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px 16px', display: 'flex', flexDirection: 'column' as const, gap: '8px' },
+  noAccountText: { fontSize: '13px', color: 'var(--muted)' },
+  signupCta: { fontSize: '14px', fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' },
+  resendBtn: { background: 'rgba(124,92,252,0.15)', border: '1px solid rgba(124,92,252,0.3)', borderRadius: '6px', padding: '8px 12px', fontSize: '12px', color: 'rgba(240,240,248,0.85)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' as const, transition: 'opacity 0.2s' },
+  resendBtnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
+}

@@ -12,6 +12,16 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
+// Helper: look up workspace_id for a given Slack team_id
+async function getWorkspaceId(teamId) {
+  const { data } = await supabase
+    .from('workspaces')
+    .select('id')
+    .eq('slack_team_id', teamId)
+    .single();
+  return data?.id || null;
+}
+
 // =============================
 // EXPRESS RECEIVER (for OAuth)
 // =============================
@@ -236,27 +246,28 @@ async function buildMyTasksView(userId, teamId) {
     supabase.from('updates').select('id, task_id').eq('user_id', userId).eq('team_id', teamId)
   ]);
 
-  const active    = (allTasks || []).filter(t => t.status === 'active');
-  const completed = (allTasks || []).filter(t => t.status === 'completed')
-                      .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
-  const deleted   = (allTasks || []).filter(t => t.status === 'deleted')
-                      .sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
+  const active     = (allTasks || []).filter(t => t.status === 'active');
+  const inProgress = (allTasks || []).filter(t => t.status === 'in_progress');
+  const completed  = (allTasks || []).filter(t => t.status === 'completed')
+                       .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
+  const archived   = (allTasks || []).filter(t => t.status === 'archived' || t.status === 'deleted')
+                       .sort((a, b) => new Date(b.deleted_at || b.created_at) - new Date(a.deleted_at || a.created_at));
 
   let updatesByTaskId = {};
   for (const upd of (allUpdatesRaw || [])) {
     updatesByTaskId[upd.task_id] = (updatesByTaskId[upd.task_id] || 0) + 1;
   }
 
-  // ── ACTIVE TASKS ──
+  // ── TO DO ──
   blocks.push({
     type: "header",
-    text: { type: "plain_text", text: "🔵 Active Tasks" }
+    text: { type: "plain_text", text: "📋 To Do" }
   });
 
   if (!active || active.length === 0) {
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: "_No active tasks. Add one above!_" }
+      text: { type: "mrkdwn", text: "_No tasks to do. Add one above!_" }
     });
   } else {
     for (const task of active) {
@@ -291,6 +302,12 @@ async function buildMyTasksView(userId, teamId) {
         },
         {
           type: "button",
+          text: { type: "plain_text", text: "▶ In Progress" },
+          value: task.id,
+          action_id: "inprogress_task"
+        },
+        {
+          type: "button",
           text: { type: "plain_text", text: "✅ Complete" },
           style: "primary",
           value: task.id,
@@ -298,10 +315,73 @@ async function buildMyTasksView(userId, teamId) {
         },
         {
           type: "button",
-          text: { type: "plain_text", text: "🗑 Delete" },
+          text: { type: "plain_text", text: "Archive" },
           style: "danger",
           value: task.id,
-          action_id: "delete_task"
+          action_id: "archive_task"
+        }
+      );
+
+      blocks.push({ type: "actions", elements: buttons });
+      blocks.push({ type: "divider" });
+    }
+  }
+
+  // ── IN PROGRESS ──
+  blocks.push({
+    type: "header",
+    text: { type: "plain_text", text: "▶ In Progress" }
+  });
+
+  if (!inProgress || inProgress.length === 0) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: "_No tasks in progress._" }
+    });
+  } else {
+    for (const task of inProgress) {
+      const hasUpdates = (updatesByTaskId[task.id] || 0) > 0;
+      const updateCount = updatesByTaskId[task.id] || 0;
+
+      blocks.push({
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: `*${task.title}*` },
+          { type: "mrkdwn", text: `📅 Started: ${formatDate(task.created_at)}` }
+        ]
+      });
+
+      const buttons = [];
+
+      if (hasUpdates) {
+        buttons.push({
+          type: "button",
+          text: { type: "plain_text", text: `💬 View Updates (${updateCount})` },
+          value: task.id,
+          action_id: "view_updates"
+        });
+      }
+
+      buttons.push(
+        {
+          type: "button",
+          text: { type: "plain_text", text: "📝 Add Update" },
+          value: task.id,
+          action_id: "update_progress"
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "✅ Complete" },
+          style: "primary",
+          value: task.id,
+          action_id: "complete_task"
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Archive" },
+          style: "danger",
+          value: task.id,
+          action_id: "archive_task"
         }
       );
 
@@ -313,7 +393,7 @@ async function buildMyTasksView(userId, teamId) {
   // ── COMPLETED TASKS ──
   blocks.push({
     type: "header",
-    text: { type: "plain_text", text: "✅ Completed Tasks" }
+    text: { type: "plain_text", text: "✅ Done" }
   });
 
   if (!completed || completed.length === 0) {
@@ -352,24 +432,19 @@ async function buildMyTasksView(userId, teamId) {
     }
   }
 
-  // ── DELETED TASKS ──
-  blocks.push({
-    type: "header",
-    text: { type: "plain_text", text: "🗑 Deleted Tasks" }
-  });
-
-  if (!deleted || deleted.length === 0) {
+  // ── ARCHIVED TASKS ──
+  if (archived && archived.length > 0) {
     blocks.push({
-      type: "section",
-      text: { type: "mrkdwn", text: "_No deleted tasks._" }
+      type: "header",
+      text: { type: "plain_text", text: "🗄 Archived" }
     });
-  } else {
-    for (const task of deleted) {
+
+    for (const task of archived) {
       blocks.push({
         type: "section",
         fields: [
-          { type: "mrkdwn", text: `*${task.title}*` },
-          { type: "mrkdwn", text: `🗑 Deleted: ${formatDate(task.deleted_at)}` }
+          { type: "mrkdwn", text: `~${task.title}~` },
+          { type: "mrkdwn", text: `Archived` }
         ]
       });
       blocks.push({ type: "divider" });
@@ -764,11 +839,13 @@ app.event('app_mention', async ({ event, client, body }) => {
   }
 
   // Create the task
+  const workspaceId = await getWorkspaceId(teamId);
   const { error } = await supabase.from('tasks').insert({
     title: taskTitle,
     user_id: assigneeSlackId,
     team_id: teamId,
-    status: 'active'
+    status: 'active',
+    ...(workspaceId ? { workspace_id: workspaceId } : {})
   });
 
   if (error) {
@@ -869,11 +946,13 @@ app.view('submit_task', async ({ ack, body, view, client }) => {
   const title = view.state.values.task.name.value;
   const teamId = view.private_metadata;
 
+  const workspaceId = await getWorkspaceId(teamId);
   await supabase.from('tasks').insert({
     title,
     user_id: body.user.id,
     team_id: teamId,
-    status: "active"
+    status: "active",
+    ...(workspaceId ? { workspace_id: workspaceId } : {})
   });
 
   await publishHome(client, body.user.id, teamId, 'my_tasks');
@@ -1060,14 +1139,29 @@ app.action('complete_task', async ({ ack, body, client }) => {
 
 
 // =============================
-// DELETE TASK
+// IN PROGRESS TASK
 // =============================
 
-app.action('delete_task', async ({ ack, body, client }) => {
+app.action('inprogress_task', async ({ ack, body, client }) => {
   await ack();
 
   await supabase.from('tasks').update({
-    status: "deleted",
+    status: "in_progress"
+  }).eq('id', body.actions[0].value);
+
+  await publishHome(client, body.user.id, getTeamId(body), 'my_tasks');
+});
+
+
+// =============================
+// ARCHIVE TASK (replaces delete)
+// =============================
+
+app.action('archive_task', async ({ ack, body, client }) => {
+  await ack();
+
+  await supabase.from('tasks').update({
+    status: "archived",
     deleted_at: new Date()
   }).eq('id', body.actions[0].value);
 

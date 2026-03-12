@@ -1,0 +1,333 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase-browser'
+
+type Props = {
+  user: { name: string; email: string }
+  workspace: { id: string; name: string; slackConnected: boolean } | null
+  role: 'owner' | 'member'
+}
+
+const navItems = [
+  {
+    href: '/dashboard',
+    label: 'My Tasks',
+    exactMatch: true,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.9"/>
+        <rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.5"/>
+        <rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.5"/>
+        <rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.3"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/dashboard/all-tasks',
+    label: 'All Tasks',
+    exactMatch: false,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/dashboard/people',
+    label: 'Members',
+    exactMatch: false,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="6" cy="5" r="2.5" fill="currentColor" opacity="0.9"/>
+        <path d="M1 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <circle cx="12" cy="5" r="2" fill="currentColor" opacity="0.5"/>
+        <path d="M14 13c0-1.86-.8-3.53-2.07-4.68" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+]
+
+export default function Sidebar({ user, workspace, role }: Props) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const [collapsed, setCollapsed] = useState(false)
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
+  function isActive(href: string, exactMatch: boolean) {
+    return exactMatch ? pathname === href : pathname.startsWith(href)
+  }
+
+  return (
+    <aside style={{ ...s.sidebar, width: collapsed ? 64 : 220 }}>
+      {/* Collapse toggle */}
+      <button
+        onClick={() => setCollapsed(v => !v)}
+        style={s.collapseBtn}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          fill="none"
+          style={{ transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease' }}
+        >
+          <path d="M7.5 2L3.5 6l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      <div style={s.top}>
+        {/* Workspace */}
+        <div style={{ ...s.workspaceRow, padding: collapsed ? '4px 0' : '4px 8px', justifyContent: collapsed ? 'center' : 'flex-start' }}>
+          <div style={s.workspaceAvatar}>
+            {workspace?.name?.[0]?.toUpperCase() || 'P'}
+          </div>
+          {!collapsed && (
+            <div style={s.workspaceName} title={workspace?.name || 'Ping'}>
+              {workspace?.name || 'Ping'}
+            </div>
+          )}
+        </div>
+
+        {/* Nav */}
+        <nav style={s.nav}>
+          {navItems.map(item => {
+            const active = isActive(item.href, item.exactMatch)
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={collapsed ? item.label : undefined}
+                style={{
+                  ...s.navItem,
+                  ...(active ? s.navItemActive : {}),
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  padding: collapsed ? '9px' : '9px 12px',
+                }}
+              >
+                <span style={{ ...s.navIcon, color: active ? 'var(--text)' : 'var(--muted)' }}>
+                  {item.icon}
+                </span>
+                {!collapsed && (
+                  <span style={{ color: active ? 'var(--text)' : 'var(--muted)' }}>
+                    {item.label}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+        </nav>
+      </div>
+
+      <div style={s.bottom}>
+        {/* Slack CTA */}
+        {workspace && !collapsed && (
+          <div style={s.slackSection}>
+            {workspace.slackConnected ? (
+              <div style={s.slackConnected}>
+                <span style={s.slackDot} />
+                Slack connected
+              </div>
+            ) : role === 'owner' ? (
+              <a href={`/api/slack/connect?workspace_id=${workspace.id}`} style={s.slackBtn}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+                  <path d="M5.04 15.33a2.52 2.52 0 01-2.52 2.52A2.52 2.52 0 010 15.33a2.52 2.52 0 012.52-2.52h2.52v2.52zm1.26 0a2.52 2.52 0 012.52-2.52 2.52 2.52 0 012.52 2.52v6.3a2.52 2.52 0 01-2.52 2.52 2.52 2.52 0 01-2.52-2.52v-6.3zM8.82 5.04a2.52 2.52 0 01-2.52-2.52A2.52 2.52 0 018.82 0a2.52 2.52 0 012.52 2.52v2.52H8.82zm0 1.26a2.52 2.52 0 012.52 2.52 2.52 2.52 0 01-2.52 2.52H2.52A2.52 2.52 0 010 8.82a2.52 2.52 0 012.52-2.52h6.3zm10.29 2.52a2.52 2.52 0 012.52-2.52A2.52 2.52 0 0124 8.82a2.52 2.52 0 01-2.52 2.52h-2.52V8.82zm-1.26 0a2.52 2.52 0 01-2.52 2.52 2.52 2.52 0 01-2.52-2.52V2.52A2.52 2.52 0 0115.18 0a2.52 2.52 0 012.52 2.52v6.3zm-2.52 10.29a2.52 2.52 0 012.52 2.52A2.52 2.52 0 0115.18 24a2.52 2.52 0 01-2.52-2.52v-2.52h2.52zm0-1.26a2.52 2.52 0 01-2.52-2.52 2.52 2.52 0 012.52-2.52h6.3A2.52 2.52 0 0124 15.33a2.52 2.52 0 01-2.52 2.52h-6.3z"/>
+                </svg>
+                Add to Slack
+              </a>
+            ) : (
+              <div style={s.slackMuted}>Ask owner to connect Slack</div>
+            )}
+          </div>
+        )}
+
+        {/* User */}
+        {!collapsed ? (
+          <div style={s.userRow}>
+            <div style={s.avatar}>{(user.name || user.email)[0].toUpperCase()}</div>
+            <div style={s.userText}>
+              <div style={s.userName}>{user.name}</div>
+              <div style={s.userEmail}>{user.email}</div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div style={{ ...s.avatar, cursor: 'default' }} title={user.name}>{(user.name || user.email)[0].toUpperCase()}</div>
+          </div>
+        )}
+        <button
+          onClick={handleSignOut}
+          style={{ ...s.signOutBtn, justifyContent: collapsed ? 'center' : 'flex-start', padding: collapsed ? '8px' : '8px 12px' }}
+          title={collapsed ? 'Sign out' : undefined}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {!collapsed && <span>Sign out</span>}
+        </button>
+      </div>
+    </aside>
+  )
+}
+
+const s: Record<string, React.CSSProperties> = {
+  sidebar: {
+    flexShrink: 0,
+    background: 'var(--surface)',
+    borderRight: '1px solid var(--border)',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    padding: '20px 10px 16px',
+    position: 'sticky',
+    top: 0,
+    height: '100vh',
+    transition: 'width 0.25s ease',
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  collapseBtn: {
+    position: 'absolute',
+    right: '-10px',
+    top: '24px',
+    width: '20px',
+    height: '20px',
+    borderRadius: '50%',
+    background: 'var(--surface2)',
+    border: '1px solid var(--border)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    color: 'var(--muted)',
+    zIndex: 20,
+    padding: 0,
+    flexShrink: 0,
+  },
+  top: { display: 'flex', flexDirection: 'column', gap: '24px' },
+  workspaceRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    overflow: 'hidden',
+  },
+  workspaceAvatar: {
+    width: '28px',
+    height: '28px',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '13px',
+    fontWeight: 700,
+    color: 'white',
+    flexShrink: 0,
+  },
+  workspaceName: {
+    fontSize: '14px',
+    fontWeight: 700,
+    letterSpacing: '-0.02em',
+    color: 'var(--text)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  nav: { display: 'flex', flexDirection: 'column', gap: '2px' },
+  navItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    borderRadius: '8px',
+    fontSize: '13.5px',
+    fontWeight: 500,
+    textDecoration: 'none',
+    transition: 'background 0.15s',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+  },
+  navItemActive: { background: 'var(--surface2)' },
+  navIcon: { flexShrink: 0, display: 'flex', alignItems: 'center' },
+  bottom: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  slackSection: { padding: '0 2px' },
+  slackBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    background: 'var(--surface2)',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '8px 10px',
+    fontSize: '12px',
+    fontWeight: 500,
+    color: 'var(--text)',
+    textDecoration: 'none',
+    whiteSpace: 'nowrap',
+  },
+  slackConnected: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontSize: '12px',
+    color: '#4ade80',
+    padding: '4px 8px',
+  },
+  slackDot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    background: '#4ade80',
+    flexShrink: 0,
+  },
+  slackMuted: { fontSize: '11px', color: 'var(--muted)', padding: '4px 8px', lineHeight: 1.4 },
+  userRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '8px 10px',
+    background: 'var(--surface2)',
+    borderRadius: '8px',
+    border: '1px solid var(--border)',
+    overflow: 'hidden',
+  },
+  avatar: {
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '12px',
+    fontWeight: 700,
+    color: 'white',
+    flexShrink: 0,
+  },
+  userText: { overflow: 'hidden' },
+  userName: { fontSize: '12px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  userEmail: { fontSize: '11px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  signOutBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    background: 'none',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    color: 'var(--muted)',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    transition: 'color 0.15s',
+  },
+}
