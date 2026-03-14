@@ -3,8 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase-browser'
-import { joinWorkspaceByToken } from '@/lib/workspace'
 
 type Props = {
   token: string
@@ -23,29 +21,37 @@ export default function JoinClient({ token, workspaceName, isLoggedIn, userId }:
     setJoining(true)
     setError('')
 
-    const supabase = createClient()
-    const result = await joinWorkspaceByToken(supabase, userId, token)
+    try {
+      const res = await fetch('/api/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      })
 
-    if (result.error === 'already_in_workspace') {
-      setError("You're already in a workspace. You can only belong to one workspace for now.")
-      setJoining(false)
-      return
-    }
+      if (res.status === 409) {
+        setError("You're already in a workspace. You can only belong to one workspace for now.")
+        setJoining(false)
+        return
+      }
 
-    if (result.error === 'invalid_token') {
-      setError('This invite link is no longer valid. Ask your teammate for a new one.')
-      setJoining(false)
-      return
-    }
+      if (res.status === 404) {
+        setError('This invite link is no longer valid. Ask your teammate for a new one.')
+        setJoining(false)
+        return
+      }
 
-    if (result.error) {
+      if (!res.ok) {
+        setError('Something went wrong. Please try again.')
+        setJoining(false)
+        return
+      }
+
+      router.push('/dashboard')
+      router.refresh()
+    } catch {
       setError('Something went wrong. Please try again.')
       setJoining(false)
-      return
     }
-
-    router.push('/dashboard')
-    router.refresh()
   }
 
   return (

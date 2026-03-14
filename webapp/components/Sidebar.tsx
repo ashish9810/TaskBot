@@ -150,6 +150,18 @@ export default function Sidebar({ user, workspace, role }: Props) {
           </div>
         )}
 
+        {/* Invite button for owners */}
+        {role === 'owner' && !collapsed && (
+          <Link href="/dashboard/people" style={s.inviteBtn}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+              <circle cx="6" cy="5" r="3" stroke="currentColor" strokeWidth="1.4"/>
+              <path d="M1 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              <path d="M13 5v4M11 7h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+            Invite teammates
+          </Link>
+        )}
+
         {/* User */}
         {!collapsed ? (
           <div style={s.userRow}>
@@ -258,6 +270,13 @@ const s: Record<string, React.CSSProperties> = {
   navItemActive: { background: 'var(--surface2)' },
   navIcon: { flexShrink: 0, display: 'flex', alignItems: 'center' },
   bottom: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  inviteBtn: {
+    display: 'flex', alignItems: 'center', gap: '8px',
+    background: 'rgba(124,92,252,0.1)', border: '1px solid rgba(124,92,252,0.25)',
+    borderRadius: '8px', padding: '8px 10px',
+    fontSize: '12px', fontWeight: 500, color: 'var(--accent-light)',
+    textDecoration: 'none', whiteSpace: 'nowrap' as const,
+  },
   slackSection: { padding: '0 2px' },
   slackBtn: {
     display: 'flex',

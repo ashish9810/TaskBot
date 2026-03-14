@@ -33,6 +33,15 @@ const receiver = new ExpressReceiver({
   stateSecret: process.env.SLACK_STATE_SECRET,
   installerOptions: {
     stateVerification: false,
+    callbackOptions: {
+      success: (installation, _options, _req, res) => {
+        const teamId = installation.team?.id || installation.enterprise?.id || '';
+        res.redirect(`http://localhost:3001/api/slack/callback?team_id=${teamId}`);
+      },
+      failure: (_error, _options, _req, res) => {
+        res.redirect('http://localhost:3001/dashboard');
+      }
+    }
   },
   scopes: [
     'app_mentions:read',
@@ -246,16 +255,59 @@ async function buildMyTasksView(userId, teamId) {
     supabase.from('updates').select('id, task_id').eq('user_id', userId).eq('team_id', teamId)
   ]);
 
+  const backlog    = (allTasks || []).filter(t => t.status === 'backlog');
   const active     = (allTasks || []).filter(t => t.status === 'active');
   const inProgress = (allTasks || []).filter(t => t.status === 'in_progress');
   const completed  = (allTasks || []).filter(t => t.status === 'completed')
                        .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
-  const archived   = (allTasks || []).filter(t => t.status === 'archived' || t.status === 'deleted')
-                       .sort((a, b) => new Date(b.deleted_at || b.created_at) - new Date(a.deleted_at || a.created_at));
 
   let updatesByTaskId = {};
   for (const upd of (allUpdatesRaw || [])) {
     updatesByTaskId[upd.task_id] = (updatesByTaskId[upd.task_id] || 0) + 1;
+  }
+
+  // ── INBOX (assigned by others) ──
+  blocks.push({
+    type: "header",
+    text: { type: "plain_text", text: `📥 Inbox${backlog.length > 0 ? ` (${backlog.length})` : ''}` }
+  });
+
+  if (!backlog || backlog.length === 0) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: "_No incoming tasks._" }
+    });
+  } else {
+    for (const task of backlog) {
+      blocks.push({
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: `*${task.title}*` },
+          { type: "mrkdwn", text: `📅 Assigned: ${formatDate(task.created_at)}${task.assigned_by ? ` by <@${task.assigned_by}>` : ''}` }
+        ]
+      });
+
+      blocks.push({
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: { type: "plain_text", text: "📋 Move to To Do" },
+            style: "primary",
+            value: task.id,
+            action_id: "backlog_to_todo"
+          },
+          {
+            type: "button",
+            text: { type: "plain_text", text: "🗑 Delete" },
+            style: "danger",
+            value: task.id,
+            action_id: "delete_task"
+          }
+        ]
+      });
+      blocks.push({ type: "divider" });
+    }
   }
 
   // ── TO DO ──
@@ -315,10 +367,10 @@ async function buildMyTasksView(userId, teamId) {
         },
         {
           type: "button",
-          text: { type: "plain_text", text: "Archive" },
+          text: { type: "plain_text", text: "🗑 Delete" },
           style: "danger",
           value: task.id,
-          action_id: "archive_task"
+          action_id: "delete_task"
         }
       );
 
@@ -378,10 +430,10 @@ async function buildMyTasksView(userId, teamId) {
         },
         {
           type: "button",
-          text: { type: "plain_text", text: "Archive" },
+          text: { type: "plain_text", text: "🗑 Delete" },
           style: "danger",
           value: task.id,
-          action_id: "archive_task"
+          action_id: "delete_task"
         }
       );
 
@@ -428,25 +480,6 @@ async function buildMyTasksView(userId, teamId) {
         });
       }
 
-      blocks.push({ type: "divider" });
-    }
-  }
-
-  // ── ARCHIVED TASKS ──
-  if (archived && archived.length > 0) {
-    blocks.push({
-      type: "header",
-      text: { type: "plain_text", text: "🗄 Archived" }
-    });
-
-    for (const task of archived) {
-      blocks.push({
-        type: "section",
-        fields: [
-          { type: "mrkdwn", text: `~${task.title}~` },
-          { type: "mrkdwn", text: `Archived` }
-        ]
-      });
       blocks.push({ type: "divider" });
     }
   }
@@ -838,13 +871,15 @@ app.event('app_mention', async ({ event, client, body }) => {
     syncUsersBackground(client, teamId);
   }
 
-  // Create the task
+  // Create the task (assigned by others → backlog; self-assigned stays active)
   const workspaceId = await getWorkspaceId(teamId);
+  const isSelfAssign = assigneeSlackId === event.user;
   const { error } = await supabase.from('tasks').insert({
     title: taskTitle,
     user_id: assigneeSlackId,
     team_id: teamId,
-    status: 'active',
+    status: isSelfAssign ? 'active' : 'backlog',
+    assigned_by: event.user,
     ...(workspaceId ? { workspace_id: workspaceId } : {})
   });
 
@@ -865,6 +900,28 @@ app.event('app_mention', async ({ event, client, body }) => {
     thread_ts: event.ts,
     text: `✅ Task assigned to ${assigneeName}:\n*${taskTitle}*`
   });
+
+  // DM assignee if they haven't signed up on web yet
+  if (!isSelfAssign) {
+    const { data: slackLink } = await supabase
+      .from('profile_slack_links')
+      .select('profile_id')
+      .eq('slack_user_id', assigneeSlackId)
+      .limit(1)
+      .single();
+
+    if (!slackLink) {
+      try {
+        const webUrl = process.env.WEB_URL || 'http://localhost:3001';
+        await client.chat.postMessage({
+          channel: assigneeSlackId,
+          text: `👋 Hey! <@${event.user}> assigned you a task on Ping:\n*${taskTitle}*\n\nSign up at ${webUrl}/signup to see all your tasks on the web dashboard.`
+        });
+      } catch (e) {
+        console.error('[app_mention] DM to assignee failed (non-fatal):', e.message);
+      }
+    }
+  }
 });
 
 
@@ -1139,6 +1196,21 @@ app.action('complete_task', async ({ ack, body, client }) => {
 
 
 // =============================
+// BACKLOG TO TODO
+// =============================
+
+app.action('backlog_to_todo', async ({ ack, body, client }) => {
+  await ack();
+
+  await supabase.from('tasks').update({
+    status: "active"
+  }).eq('id', body.actions[0].value);
+
+  await publishHome(client, body.user.id, getTeamId(body), 'my_tasks');
+});
+
+
+// =============================
 // IN PROGRESS TASK
 // =============================
 
@@ -1154,16 +1226,15 @@ app.action('inprogress_task', async ({ ack, body, client }) => {
 
 
 // =============================
-// ARCHIVE TASK (replaces delete)
+// DELETE TASK (permanent)
 // =============================
 
-app.action('archive_task', async ({ ack, body, client }) => {
+app.action('delete_task', async ({ ack, body, client }) => {
   await ack();
 
-  await supabase.from('tasks').update({
-    status: "archived",
-    deleted_at: new Date()
-  }).eq('id', body.actions[0].value);
+  const taskId = body.actions[0].value;
+  await supabase.from('updates').delete().eq('task_id', taskId);
+  await supabase.from('tasks').delete().eq('id', taskId);
 
   await publishHome(client, body.user.id, getTeamId(body), 'my_tasks');
 });

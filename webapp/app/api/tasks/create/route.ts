@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { title, assignee_profile_id, status } = await request.json()
+  const { title, assignee_profile_id, status, priority, due_date } = await request.json()
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
 
   const admin = createServiceClient(
@@ -50,6 +50,8 @@ export async function POST(request: NextRequest) {
     status: status || 'active',
   }
 
+  if (priority) insert.priority = priority
+  if (due_date) insert.due_date = due_date
   if (taskTeamId) insert.team_id = taskTeamId
 
   const { data: task, error } = await admin

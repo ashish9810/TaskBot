@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import JoinClient from './JoinClient'
 
 type Props = { params: Promise<{ token: string }> }
@@ -7,8 +8,13 @@ export default async function JoinPage({ params }: Props) {
   const { token } = await params
   const supabase = await createClient()
 
-  // Look up the invite token to get workspace name (public — no auth needed)
-  const { data: invite } = await supabase
+  // Use service role to bypass RLS — invite lookup must work for unauthenticated users
+  const admin = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: invite } = await admin
     .from('workspace_invites')
     .select('workspace_id, workspaces(name)')
     .eq('token', token)

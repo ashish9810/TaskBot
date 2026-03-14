@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import ChatInput from '@/components/ChatInput'
 
 export type Task = {
   id: string
@@ -10,6 +9,16 @@ export type Task = {
   created_at: string
   completed_at?: string | null
   user_id?: string
+  priority?: string | null
+  due_date?: string | null
+  assigned_by?: string | null
+}
+
+type TaskUpdate = {
+  id: string
+  content: string
+  created_at: string
+  user_name: string
 }
 
 type Props = {
@@ -21,6 +30,14 @@ type Props = {
 }
 
 const COLUMNS = [
+  {
+    id: 'backlog',
+    label: 'Inbox',
+    color: '#f59e0b',
+    accent: '#d97706',
+    glow: 'rgba(217,119,6,0.15)',
+    bar: 'linear-gradient(90deg, #b45309, #f59e0b)',
+  },
   {
     id: 'active',
     label: 'To Do',
@@ -52,16 +69,22 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [quickAddCol, setQuickAddCol] = useState<string | null>(null)
+  const [detailTask, setDetailTask] = useState<Task | null>(null)
   const dragTask = useRef<Task | null>(null)
 
   const grouped = {
+    backlog:     tasks.filter(t => t.status === 'backlog'),
     active:      tasks.filter(t => t.status === 'active'),
     in_progress: tasks.filter(t => t.status === 'in_progress'),
     completed:   tasks.filter(t => t.status === 'completed'),
   } as Record<string, Task[]>
 
-  const archived = tasks.filter(t => t.status === 'archived' || t.status === 'deleted')
-  const activeCount = tasks.filter(t => t.status === 'active' || t.status === 'in_progress').length
+  const activeCount = tasks.filter(t => t.status === 'backlog' || t.status === 'active' || t.status === 'in_progress').length
+
+  async function deleteTask(taskId: string) {
+    setTasks(prev => prev.filter(t => t.id !== taskId))
+    await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
+  }
 
   async function moveTask(taskId: string, newStatus: string) {
     setTasks(prev => prev.map(t =>
@@ -103,6 +126,16 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
     } catch { /* ignore */ }
   }
 
+  async function updateTaskField(taskId: string, field: string, value: string | null) {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, [field]: value } : t))
+    if (detailTask?.id === taskId) setDetailTask(prev => prev ? { ...prev, [field]: value } : prev)
+    await fetch(`/api/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value }),
+    })
+  }
+
   function onDragStart(task: Task) {
     dragTask.current = task
     setDraggingId(task.id)
@@ -118,7 +151,9 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
     if (dragTask.current && dragTask.current.status !== colId) {
       moveTask(dragTask.current.id, colId)
     }
+    setDraggingId(null)
     setDragOver(null)
+    dragTask.current = null
   }
 
   return (
@@ -137,13 +172,6 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
         )}
       </div>
 
-      {/* AI Input */}
-      <ChatInput
-        workspaceId={workspaceId}
-        userId={userId}
-        slackUserId={slackUserId}
-        onTaskCreated={handleTaskCreated}
-      />
 
       {/* Kanban board */}
       <div style={s.board}>
@@ -215,6 +243,8 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
                       onDragEnd={onDragEnd}
                       onUpdateTitle={t => updateTitle(task.id, t)}
                       onMove={moveTask}
+                      onDelete={deleteTask}
+                      onOpenDetail={() => setDetailTask(task)}
                       columns={COLUMNS}
                     />
                   ))
@@ -226,7 +256,16 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
       </div>
 
       {/* Archived */}
-      {archived.length > 0 && <ArchivedSection tasks={archived} />}
+      {/* Task Detail Modal */}
+      {detailTask && (
+        <TaskDetailModal
+          task={detailTask}
+          onClose={() => setDetailTask(null)}
+          onUpdateField={(field, value) => updateTaskField(detailTask.id, field, value)}
+          onStatusChange={(status) => { moveTask(detailTask.id, status); setDetailTask(prev => prev ? { ...prev, status } : prev) }}
+          onTitleChange={(title) => { updateTitle(detailTask.id, title); setDetailTask(prev => prev ? { ...prev, title } : prev) }}
+        />
+      )}
     </div>
   )
 }
@@ -262,9 +301,16 @@ function QuickAddCard({ onAdd, onCancel, accentColor }: { onAdd: (t: string) => 
   )
 }
 
+const priorityColors: Record<string, { color: string; bg: string }> = {
+  low: { color: '#4ade80', bg: 'rgba(74,222,128,0.12)' },
+  medium: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  high: { color: '#f97316', bg: 'rgba(249,115,22,0.12)' },
+  urgent: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+}
+
 // ─── Kanban Card ─────────────────────────────────────────────────────────────
 
-function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTitle, onMove, columns }: {
+function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTitle, onMove, onDelete, onOpenDetail, columns }: {
   task: Task
   col: typeof COLUMNS[0]
   isDragging: boolean
@@ -272,6 +318,8 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
   onDragEnd: () => void
   onUpdateTitle: (t: string) => void
   onMove: (id: string, status: string) => void
+  onDelete: (id: string) => void
+  onOpenDetail: () => void
   columns: typeof COLUMNS
 }) {
   const [editing, setEditing] = useState(false)
@@ -281,6 +329,7 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
   const inputRef = useRef<HTMLInputElement>(null)
 
   const isCompleted = task.status === 'completed'
+  const isInProgress = task.status === 'in_progress'
   const date = (isCompleted && task.completed_at)
     ? new Date(task.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : new Date(task.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -305,7 +354,7 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
       style={{
         ...c.card,
         ...(isDragging ? c.dragging : {}),
-        ...(hovered && !isDragging ? { ...c.hover, borderColor: `${col.accent}40` } : {}),
+        ...(hovered && !isDragging ? c.hover : {}),
         borderLeftColor: col.accent,
       }}
     >
@@ -325,7 +374,7 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
           />
         ) : (
           <div
-            onClick={startEdit}
+            onClick={onOpenDetail}
             style={{
               ...c.title,
               ...(isCompleted ? c.titleDone : {}),
@@ -334,6 +383,22 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
             {localTitle || '(untitled)'}
           </div>
         )}
+
+        {/* Priority & Due Date */}
+        {(task.priority && task.priority !== 'none') || task.due_date ? (
+          <div style={c.metaRow}>
+            {task.priority && task.priority !== 'none' && (
+              <span style={{ ...c.priorityBadge, color: priorityColors[task.priority]?.color || '#94a3b8', background: priorityColors[task.priority]?.bg || 'rgba(148,163,184,0.1)' }}>
+                {task.priority}
+              </span>
+            )}
+            {task.due_date && (
+              <span style={c.dueBadge}>
+                {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            )}
+          </div>
+        ) : null}
 
         {/* Footer row */}
         <div style={c.footer}>
@@ -366,8 +431,8 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
                       </button>
                     ))}
                     <div style={c.menuDivider} />
-                    <button onClick={() => { setMenuOpen(false); onMove(task.id, 'archived') }} style={{ ...c.menuItem, color: 'var(--muted)' }}>
-                      Archive
+                    <button onClick={() => { setMenuOpen(false); onDelete(task.id) }} style={{ ...c.menuItem, color: '#f87171' }}>
+                      Delete
                     </button>
                   </div>
                 )}
@@ -376,34 +441,6 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-// ─── Archived ────────────────────────────────────────────────────────────────
-
-function ArchivedSection({ tasks }: { tasks: Task[] }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div style={ar.wrap}>
-      <button onClick={() => setOpen(v => !v)} style={ar.toggle}>
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
-          style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
-          <path d="M3 1l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        Archived
-        <span style={ar.count}>{tasks.length}</span>
-      </button>
-      {open && (
-        <div style={ar.list}>
-          {tasks.map(t => (
-            <div key={t.id} style={ar.row}>
-              <span style={ar.title}>{t.title}</span>
-              <span style={ar.date}>{new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -453,7 +490,9 @@ const s: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     background: 'var(--surface)',
     borderRadius: '16px',
-    border: '1px solid var(--border)',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: 'var(--border)',
     overflow: 'hidden',
     transition: 'border-color 0.2s, box-shadow 0.2s',
     maxHeight: 'calc(100vh - 300px)',
@@ -494,7 +533,7 @@ const s: Record<string, React.CSSProperties> = {
 
   emptyCol: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    border: '1.5px dashed rgba(255,255,255,0.08)',
+    borderWidth: '1.5px', borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.08)',
     borderRadius: '12px',
     padding: '28px 20px',
     fontSize: '12px', color: 'var(--muted)',
@@ -508,32 +547,34 @@ const s: Record<string, React.CSSProperties> = {
 // Card styles
 const c: Record<string, React.CSSProperties> = {
   card: {
-    background: 'var(--surface2)',
-    borderRadius: '12px',
-    border: '1px solid var(--border)',
-    borderLeft: '3px solid transparent',
+    background: 'linear-gradient(180deg, #23243a 0%, #1a1b2e 100%)',
+    borderRadius: '14px',
+    borderTopWidth: '1px', borderRightWidth: '1px', borderBottomWidth: '1px', borderLeftWidth: '3px',
+    borderTopStyle: 'solid', borderRightStyle: 'solid', borderBottomStyle: 'solid', borderLeftStyle: 'solid',
+    borderTopColor: 'rgba(255,255,255,0.12)', borderRightColor: 'rgba(255,255,255,0.06)', borderBottomColor: 'rgba(0,0,0,0.4)', borderLeftColor: 'transparent',
     padding: '0',
     cursor: 'grab',
     display: 'flex',
-    transition: 'transform 0.15s, box-shadow 0.2s, border-color 0.15s, background 0.15s',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.07) inset',
+    transition: 'transform 0.18s, box-shadow 0.2s',
     userSelect: 'none' as const,
     overflow: 'hidden',
-    animation: 'popIn 0.2s ease',
   },
   dragging: { opacity: 0.35, transform: 'scale(0.97) rotate(-1deg)', cursor: 'grabbing' },
   hover: {
-    background: 'var(--surface3)',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-    transform: 'translateY(-2px)',
+    background: 'linear-gradient(180deg, #2a2b42 0%, #1e1f34 100%)',
+    boxShadow: '0 8px 28px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.12) inset',
+    transform: 'translateY(-3px)',
   },
   stripe: { width: '3px', flexShrink: 0 },
-  body: { flex: 1, padding: '12px 12px 10px', display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 },
+  body: { flex: 1, padding: '14px 14px 11px', display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 },
 
   title: {
-    fontSize: '14px', fontWeight: 500, color: 'var(--text)',
-    lineHeight: 1.45, cursor: 'text', wordBreak: 'break-word' as const,
+    fontSize: '14px', fontWeight: 600, color: '#ffffff',
+    lineHeight: 1.5, cursor: 'text', wordBreak: 'break-word' as const,
+    textShadow: '0 1px 3px rgba(0,0,0,0.5)',
   },
-  titleDone: { textDecoration: 'line-through', color: 'var(--muted)', opacity: 0.7 },
+  titleDone: { textDecoration: 'line-through' },
   titleInput: {
     width: '100%', background: 'transparent', border: 'none',
     borderBottom: '1.5px solid var(--accent)', outline: 'none',
@@ -583,6 +624,16 @@ const c: Record<string, React.CSSProperties> = {
   },
   menuDot: { width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0 },
   menuDivider: { height: '1px', background: 'var(--border)', margin: '4px 2px' },
+  metaRow: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' as const },
+  priorityBadge: {
+    fontSize: '10px', fontWeight: 600, textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em', padding: '2px 7px', borderRadius: '4px',
+  },
+  dueBadge: {
+    fontSize: '10px', fontWeight: 500, color: 'var(--muted)',
+    padding: '2px 7px', borderRadius: '4px',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
+  },
 }
 
 // Quick add styles
@@ -615,27 +666,320 @@ const qa: Record<string, React.CSSProperties> = {
   },
 }
 
-// Archived styles
-const ar: Record<string, React.CSSProperties> = {
-  wrap: { borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '4px' },
-  toggle: {
-    display: 'flex', alignItems: 'center', gap: '8px',
-    background: 'none', border: 'none', color: 'var(--muted)',
-    fontSize: '11px', fontWeight: 700, cursor: 'pointer',
-    padding: '4px 0', fontFamily: 'inherit',
-    textTransform: 'uppercase' as const, letterSpacing: '0.07em',
+
+// ─── Task Detail Modal ───────────────────────────────────────────────────────
+
+const PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'] as const
+const STATUS_OPTIONS = COLUMNS.map(c => ({ id: c.id, label: c.label, color: c.accent }))
+
+function TaskDetailModal({ task, onClose, onUpdateField, onStatusChange, onTitleChange }: {
+  task: Task
+  onClose: () => void
+  onUpdateField: (field: string, value: string | null) => void
+  onStatusChange: (status: string) => void
+  onTitleChange: (title: string) => void
+}) {
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [localTitle, setLocalTitle] = useState(task.title)
+  const [updates, setUpdates] = useState<TaskUpdate[]>([])
+  const [loadingUpdates, setLoadingUpdates] = useState(true)
+  const [newUpdate, setNewUpdate] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const titleRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { setLocalTitle(task.title) }, [task.title])
+
+  useEffect(() => {
+    setLoadingUpdates(true)
+    fetch(`/api/tasks/${task.id}/updates`)
+      .then(r => r.json())
+      .then(data => { setUpdates(Array.isArray(data) ? data : []); setLoadingUpdates(false) })
+      .catch(() => setLoadingUpdates(false))
+  }, [task.id])
+
+  function commitTitle() {
+    setEditingTitle(false)
+    const t = localTitle.trim()
+    if (t && t !== task.title) onTitleChange(t)
+    else setLocalTitle(task.title)
+  }
+
+  async function addUpdate() {
+    if (!newUpdate.trim() || submitting) return
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newUpdate.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setUpdates(prev => [...prev, { ...data, user_name: 'You' }])
+        setNewUpdate('')
+      }
+    } catch { /* ignore */ }
+    setSubmitting(false)
+  }
+
+  const col = COLUMNS.find(c => c.id === task.status) || COLUMNS[1]
+
+  return (
+    <div style={m.overlay} onClick={onClose}>
+      <div style={m.modal} onClick={e => e.stopPropagation()}>
+        {/* Close button */}
+        <button onClick={onClose} style={m.closeBtn}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+          </svg>
+        </button>
+
+        {/* Title */}
+        <div style={m.titleRow}>
+          <div style={{ ...m.titleDot, background: col.accent }} />
+          {editingTitle ? (
+            <input
+              ref={titleRef}
+              value={localTitle}
+              onChange={e => setLocalTitle(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={e => { if (e.key === 'Enter') commitTitle(); if (e.key === 'Escape') { setLocalTitle(task.title); setEditingTitle(false) } }}
+              style={m.titleInput}
+              autoFocus
+            />
+          ) : (
+            <h2 onClick={() => { setEditingTitle(true); setTimeout(() => titleRef.current?.focus(), 0) }} style={m.title}>
+              {task.title}
+            </h2>
+          )}
+        </div>
+
+        {/* Meta row: Status, Priority, Due Date */}
+        <div style={m.metaGrid}>
+          <div style={m.metaItem}>
+            <span style={m.metaLabel}>Status</span>
+            <div style={m.metaOptions}>
+              {STATUS_OPTIONS.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => onStatusChange(s.id)}
+                  style={{
+                    ...m.statusChip,
+                    ...(task.status === s.id ? { background: s.color + '25', borderColor: s.color + '60', color: s.color } : {}),
+                  }}
+                >
+                  <span style={{ ...m.chipDot, background: task.status === s.id ? s.color : 'var(--muted)' }} />
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={m.metaItem}>
+            <span style={m.metaLabel}>Priority</span>
+            <div style={m.metaOptions}>
+              {PRIORITIES.map(p => (
+                <button
+                  key={p}
+                  onClick={() => onUpdateField('priority', p)}
+                  style={{
+                    ...m.statusChip,
+                    ...((task.priority || 'none') === p ? {
+                      background: (priorityColors[p]?.bg || 'rgba(148,163,184,0.1)'),
+                      borderColor: (priorityColors[p]?.color || '#64748b') + '60',
+                      color: priorityColors[p]?.color || '#94a3b8',
+                    } : {}),
+                  }}
+                >
+                  {p === 'none' ? 'None' : p.charAt(0).toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={m.metaItem}>
+            <span style={m.metaLabel}>Due Date</span>
+            <input
+              type="date"
+              value={task.due_date || ''}
+              onChange={e => onUpdateField('due_date', e.target.value || null)}
+              style={m.dateInput}
+            />
+          </div>
+        </div>
+
+        <div style={m.divider} />
+
+        {/* Updates Timeline */}
+        <div style={m.updatesSection}>
+          <h3 style={m.updatesTitle}>Updates</h3>
+
+          <div style={m.timeline}>
+            {/* Root: the task itself */}
+            <div style={m.timelineItem}>
+              <div style={m.timelineNodeWrap}>
+                <div style={{ ...m.timelineNode, background: col.accent, width: '12px', height: '12px' }} />
+                {(updates.length > 0 || !loadingUpdates) && <div style={m.timelineLine} />}
+              </div>
+              <div style={m.timelineContent}>
+                <span style={m.timelineLabel}>Task created</span>
+                <span style={m.timelineDate}>
+                  {new Date(task.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              </div>
+            </div>
+
+            {/* Updates */}
+            {loadingUpdates ? (
+              <div style={{ padding: '12px 0 12px 30px', color: 'var(--muted)', fontSize: '13px' }}>Loading...</div>
+            ) : updates.map((upd, i) => (
+              <div key={upd.id} style={m.timelineItem}>
+                <div style={m.timelineNodeWrap}>
+                  <div style={m.timelineNode} />
+                  {i < updates.length - 1 && <div style={m.timelineLine} />}
+                </div>
+                <div style={m.timelineContent}>
+                  <div style={m.updateBubble}>
+                    <div style={m.updateHeader}>
+                      <span style={m.updateAuthor}>{upd.user_name}</span>
+                      <span style={m.updateDate}>
+                        {new Date(upd.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {' '}
+                        {new Date(upd.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p style={m.updateText}>{upd.content}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Add update */}
+          <div style={m.addUpdateRow}>
+            <div style={m.timelineNodeWrap}>
+              <div style={{ ...m.timelineNode, background: 'var(--accent)' }} />
+            </div>
+            <div style={m.addUpdateInputWrap}>
+              <textarea
+                value={newUpdate}
+                onChange={e => setNewUpdate(e.target.value)}
+                placeholder="Add an update..."
+                style={m.addUpdateInput}
+                rows={2}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addUpdate() } }}
+              />
+              <button
+                onClick={addUpdate}
+                disabled={!newUpdate.trim() || submitting}
+                style={{ ...m.addUpdateBtn, opacity: !newUpdate.trim() || submitting ? 0.4 : 1 }}
+              >
+                {submitting ? 'Posting...' : 'Post'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Modal styles
+const m: Record<string, React.CSSProperties> = {
+  overlay: {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 1000, padding: '24px',
   },
-  count: {
-    fontSize: '10px', color: 'var(--muted)',
+  modal: {
+    background: 'var(--surface)', border: '1px solid var(--border2)',
+    borderRadius: '18px', padding: '28px', width: '100%', maxWidth: '560px',
+    maxHeight: '85vh', overflowY: 'auto' as const, position: 'relative' as const,
+    boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+  },
+  closeBtn: {
+    position: 'absolute' as const, top: '16px', right: '16px',
     background: 'var(--surface2)', border: '1px solid var(--border)',
-    borderRadius: '100px', padding: '1px 7px',
+    borderRadius: '8px', width: '30px', height: '30px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', color: 'var(--muted)', padding: 0,
   },
-  list: { display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' },
-  row: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '9px 14px', background: 'var(--surface)',
-    border: '1px solid var(--border)', borderRadius: '8px', opacity: 0.45,
+  titleRow: { display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', paddingRight: '40px' },
+  titleDot: { width: '10px', height: '10px', borderRadius: '50%', marginTop: '7px', flexShrink: 0 },
+  title: {
+    fontSize: '20px', fontWeight: 700, color: '#ffffff', cursor: 'text',
+    letterSpacing: '-0.02em', lineHeight: 1.35, wordBreak: 'break-word' as const,
   },
-  title: { fontSize: '13px', color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
-  date: { fontSize: '11px', color: 'var(--muted)', flexShrink: 0 },
+  titleInput: {
+    width: '100%', background: 'transparent', border: 'none',
+    borderBottom: '2px solid var(--accent)', outline: 'none',
+    fontSize: '20px', fontWeight: 700, color: '#ffffff',
+    fontFamily: 'inherit', padding: '0 0 4px', lineHeight: 1.35,
+  },
+
+  metaGrid: { display: 'flex', flexDirection: 'column' as const, gap: '14px', marginBottom: '20px' },
+  metaItem: { display: 'flex', flexDirection: 'column' as const, gap: '6px' },
+  metaLabel: { fontSize: '11px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' },
+  metaOptions: { display: 'flex', flexWrap: 'wrap' as const, gap: '6px' },
+  statusChip: {
+    background: 'var(--surface2)', border: '1px solid var(--border)',
+    borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: 500,
+    color: 'var(--muted)', cursor: 'pointer', fontFamily: 'inherit',
+    display: 'inline-flex', alignItems: 'center', gap: '5px',
+    transition: 'all 0.15s',
+  },
+  chipDot: { width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0 },
+  dateInput: {
+    background: 'var(--surface2)', border: '1px solid var(--border)',
+    borderRadius: '8px', padding: '7px 12px', fontSize: '13px',
+    color: 'var(--text)', fontFamily: 'inherit', width: 'fit-content',
+    outline: 'none', colorScheme: 'dark',
+  },
+
+  divider: { height: '1px', background: 'var(--border)', margin: '4px 0 16px' },
+
+  updatesSection: {},
+  updatesTitle: { fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '14px', letterSpacing: '-0.01em' },
+
+  timeline: { display: 'flex', flexDirection: 'column' as const },
+  timelineItem: { display: 'flex', gap: '12px', minHeight: '40px' },
+  timelineNodeWrap: {
+    display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
+    width: '12px', flexShrink: 0,
+  },
+  timelineNode: {
+    width: '10px', height: '10px', borderRadius: '50%',
+    background: 'var(--border2)', flexShrink: 0, border: '2px solid var(--surface)',
+  },
+  timelineLine: {
+    width: '2px', flex: 1, background: 'var(--border)', minHeight: '12px',
+  },
+  timelineContent: {
+    flex: 1, paddingBottom: '14px', display: 'flex', flexDirection: 'column' as const, gap: '2px',
+  },
+  timelineLabel: { fontSize: '12px', fontWeight: 600, color: 'var(--muted)' },
+  timelineDate: { fontSize: '11px', color: 'var(--muted)', opacity: 0.7 },
+
+  updateBubble: {
+    background: 'var(--surface2)', border: '1px solid var(--border)',
+    borderRadius: '10px', padding: '10px 13px',
+  },
+  updateHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' },
+  updateAuthor: { fontSize: '12px', fontWeight: 600, color: 'var(--accent-light)' },
+  updateDate: { fontSize: '10px', color: 'var(--muted)' },
+  updateText: { fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.55 },
+
+  addUpdateRow: { display: 'flex', gap: '12px', marginTop: '4px' },
+  addUpdateInputWrap: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: '8px' },
+  addUpdateInput: {
+    background: 'var(--surface2)', border: '1px solid var(--border)',
+    borderRadius: '10px', padding: '10px 13px', fontSize: '13px',
+    color: 'var(--text)', fontFamily: 'inherit', resize: 'none' as const,
+    outline: 'none', lineHeight: 1.5, width: '100%',
+  },
+  addUpdateBtn: {
+    alignSelf: 'flex-end' as const, background: 'var(--accent)', color: 'white',
+    border: 'none', borderRadius: '7px', padding: '6px 16px',
+    fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+  },
 }

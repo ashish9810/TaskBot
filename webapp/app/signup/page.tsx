@@ -12,6 +12,7 @@ function SignupForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const prefillEmail = searchParams.get('email') || ''
+  const nextUrl = searchParams.get('next') || '/dashboard'
 
   const [screen, setScreen] = useState<Screen>('form')
   const [name, setName] = useState('')
@@ -84,7 +85,7 @@ function SignupForm() {
         await supabase.from('profiles').upsert({ id: data.user.id, email, name })
         await syncSlackIdentity(supabase, data.user.id, email)
       }
-      router.push('/dashboard')
+      router.push(nextUrl)
       router.refresh()
     } else {
       // Email confirmation required — show check email screen
