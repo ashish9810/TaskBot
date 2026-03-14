@@ -62,7 +62,7 @@ export default async function PersonPage({ params }: Props) {
           </div>
           <div style={styles.taskList}>
             {completedTasks.map((task) => (
-              <TaskCard key={task.id} task={task} completed />
+              <TaskCard key={task.id} task={task} readonly />
             ))}
           </div>
         </div>
