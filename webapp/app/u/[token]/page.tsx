@@ -142,11 +142,11 @@ export default async function PublicProfilePage({ params }: Props) {
                   <span style={{ ...s.taskTitle, textDecoration: 'line-through', color: 'var(--muted)' }}>
                     {t.title as string}
                   </span>
-                  {t.completed_at && (
+                  {t.completed_at ? (
                     <span style={s.statusLabel}>
                       {new Date(t.completed_at as string).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
-                  )}
+                  ) : null}
                 </div>
               ))}
             </div>
