@@ -19,7 +19,7 @@ export async function POST() {
   const { data: slackUsers } = await admin
     .from('users')
     .select('slack_user_id, team_id')
-    .eq('email', email)
+    .ilike('email', email)
 
   if (!slackUsers || slackUsers.length === 0) {
     return NextResponse.json({ linked: 0 })

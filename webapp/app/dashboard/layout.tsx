@@ -27,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     const { data: slackUsers } = await admin
       .from('users')
       .select('slack_user_id, team_id')
-      .eq('email', profile.email)
+      .ilike('email', profile.email)
     if (slackUsers && slackUsers.length > 0) {
       await admin
         .from('profile_slack_links')
