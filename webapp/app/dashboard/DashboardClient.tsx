@@ -373,13 +373,10 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [priorityOpen, setPriorityOpen] = useState(false)
-  const [dueDateOpen, setDueDateOpen] = useState(false)
   const dragStartPos = useRef<{ x: number; y: number } | null>(null)
+  const dateInputRef = useRef<HTMLInputElement>(null)
 
   const isCompleted = task.status === 'completed'
-  const date = (isCompleted && task.completed_at)
-    ? new Date(task.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    : new Date(task.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
   const otherCols = columns.filter(c => c.id !== task.status)
 
@@ -414,7 +411,7 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
       onMouseDown={handleMouseDown}
       onMouseUp={handleCardMouseUp}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setMenuOpen(false); setPriorityOpen(false); setDueDateOpen(false) }}
+      onMouseLeave={() => { setHovered(false); setMenuOpen(false); setPriorityOpen(false) }}
       style={{
         ...c.card,
         ...(isDragging ? c.dragging : {}),
@@ -443,16 +440,24 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
           <div style={c.footerRight}>
             {/* Inline priority icon */}
             <div style={{ position: 'relative' }} data-no-modal>
-              <PriorityIcon priority={task.priority || 'none'} onClick={(e) => { e.stopPropagation(); setPriorityOpen(v => !v); setDueDateOpen(false); setMenuOpen(false) }} />
+              <PriorityIcon priority={task.priority || 'none'} onClick={(e) => { e.stopPropagation(); setPriorityOpen(v => !v); setMenuOpen(false) }} />
               {priorityOpen && (
                 <PriorityDropdown current={task.priority || 'none'} onSelect={(p) => { onUpdateField('priority', p); setPriorityOpen(false) }} />
               )}
             </div>
 
-            {/* Inline due date */}
+            {/* Inline due date — single click opens native picker */}
             <div style={{ position: 'relative' }} data-no-modal>
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={task.due_date || ''}
+                onChange={(e) => onUpdateField('due_date', e.target.value || null)}
+                style={c.hiddenDateInput}
+                onClick={(e) => e.stopPropagation()}
+              />
               <button
-                onClick={(e) => { e.stopPropagation(); setDueDateOpen(v => !v); setPriorityOpen(false); setMenuOpen(false) }}
+                onClick={(e) => { e.stopPropagation(); dateInputRef.current?.showPicker?.(); dateInputRef.current?.click() }}
                 style={{ ...c.inlineBtn, color: task.due_date ? 'var(--text)' : 'var(--muted)' }}
                 title={task.due_date ? `Due: ${task.due_date}` : 'Set due date'}
               >
@@ -467,26 +472,7 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
                     : 'Due Date'}
                 </span>
               </button>
-              {dueDateOpen && (
-                <div style={{ ...c.dropdown, minWidth: '160px' }} data-no-modal>
-                  <div style={{ padding: '6px 8px', fontSize: '10px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Set due date</div>
-                  <input
-                    type="date"
-                    value={task.due_date || ''}
-                    onChange={(e) => { onUpdateField('due_date', e.target.value || null); setDueDateOpen(false) }}
-                    style={c.datePickerInput}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  {task.due_date && (
-                    <button onClick={(e) => { e.stopPropagation(); onUpdateField('due_date', null); setDueDateOpen(false) }} style={{ ...c.dropdownItem, color: '#f87171', fontSize: '11px' }}>
-                      Clear date
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
-
-            <span style={c.date}>{date}</span>
 
             {/* More menu */}
             {hovered && (
@@ -709,11 +695,11 @@ const c: Record<string, React.CSSProperties> = {
   },
   dueDateText: { fontSize: '10px', fontWeight: 500, whiteSpace: 'nowrap' as const },
   dropdown: {
-    position: 'absolute' as const, left: '50%', bottom: '100%', transform: 'translateX(-50%)',
-    marginBottom: '6px',
+    position: 'absolute' as const, right: 0, bottom: '28px',
     background: 'var(--surface)', border: '1px solid var(--border2)',
     borderRadius: '10px', padding: '4px', zIndex: 200, minWidth: '130px',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+    boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+    maxHeight: '220px', overflowY: 'auto' as const,
   },
   dropdownItem: {
     display: 'flex', alignItems: 'center', gap: '7px',
@@ -723,11 +709,9 @@ const c: Record<string, React.CSSProperties> = {
     borderRadius: '6px', fontFamily: 'inherit',
   },
   dropdownDot: { width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0 },
-  datePickerInput: {
-    background: 'var(--surface2)', border: '1px solid var(--border)',
-    borderRadius: '6px', padding: '6px 8px', fontSize: '12px',
-    color: 'var(--text)', fontFamily: 'inherit', width: '100%',
-    outline: 'none', colorScheme: 'dark', margin: '2px 0',
+  hiddenDateInput: {
+    position: 'absolute' as const, opacity: 0, width: 0, height: 0,
+    pointerEvents: 'none' as const, overflow: 'hidden',
   },
 }
 
