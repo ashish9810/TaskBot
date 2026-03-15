@@ -317,7 +317,7 @@ function PriorityIcon({ priority, onClick }: { priority: string; onClick: (e: Re
   const bars = p === 'urgent' ? 4 : p === 'high' ? 3 : p === 'medium' ? 2 : p === 'low' ? 1 : 0
   return (
     <button onClick={onClick} style={c.inlineBtn} title={`Priority: ${p}`}>
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ pointerEvents: 'none' }}>
         {[0,1,2,3].map(i => (
           <rect key={i} x={1 + i * 3.5} y={10 - (i + 1) * 2.2} width="2.5" height={(i + 1) * 2.2}
             rx="0.5" fill={i < bars ? color : 'rgba(255,255,255,0.08)'} />
@@ -454,7 +454,7 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
                 style={{ ...c.inlineBtn, color: task.due_date ? 'var(--text)' : 'var(--muted)' }}
                 title={task.due_date ? `Due: ${task.due_date}` : 'Set due date'}
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ pointerEvents: 'none' }}>
                   <rect x="1.5" y="2.5" width="11" height="9.5" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
                   <path d="M1.5 5.5h11" stroke="currentColor" strokeWidth="1.2"/>
                   <path d="M4.5 1v2M9.5 1v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
@@ -471,7 +471,7 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
             {hovered && (
               <div style={{ position: 'relative' }} data-no-modal>
                 <button onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); setPriorityOpen(false) }} style={c.moreBtn}>
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ pointerEvents: 'none' }}>
                     <circle cx="6.5" cy="2.5" r="1.2" fill="currentColor"/>
                     <circle cx="6.5" cy="6.5" r="1.2" fill="currentColor"/>
                     <circle cx="6.5" cy="10.5" r="1.2" fill="currentColor"/>
