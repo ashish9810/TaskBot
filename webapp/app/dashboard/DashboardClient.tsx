@@ -245,6 +245,7 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
                       onMove={moveTask}
                       onDelete={deleteTask}
                       onOpenDetail={() => setDetailTask(task)}
+                      onUpdateField={(field, value) => updateTaskField(task.id, field, value)}
                       columns={COLUMNS}
                     />
                   ))
@@ -310,7 +311,40 @@ const priorityColors: Record<string, { color: string; bg: string }> = {
 
 // ─── Kanban Card ─────────────────────────────────────────────────────────────
 
-function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTitle, onMove, onDelete, onOpenDetail, columns }: {
+function PriorityIcon({ priority, onClick }: { priority: string; onClick: (e: React.MouseEvent) => void }) {
+  const p = priority || 'none'
+  const color = priorityColors[p]?.color || 'var(--muted)'
+  const bars = p === 'urgent' ? 4 : p === 'high' ? 3 : p === 'medium' ? 2 : p === 'low' ? 1 : 0
+  return (
+    <button onClick={onClick} style={c.inlineBtn} title={`Priority: ${p}`}>
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        {[0,1,2,3].map(i => (
+          <rect key={i} x={1 + i * 3.5} y={10 - (i + 1) * 2.2} width="2.5" height={(i + 1) * 2.2}
+            rx="0.5" fill={i < bars ? color : 'rgba(255,255,255,0.08)'} />
+        ))}
+      </svg>
+    </button>
+  )
+}
+
+function PriorityDropdown({ current, onSelect }: { current: string; onSelect: (p: string) => void }) {
+  const options = ['none', 'low', 'medium', 'high', 'urgent'] as const
+  return (
+    <div style={c.dropdown}>
+      {options.map(p => (
+        <button key={p} onClick={() => onSelect(p)} style={{
+          ...c.dropdownItem,
+          ...(current === p ? { background: 'var(--surface3)', color: 'var(--text)' } : {}),
+        }}>
+          <span style={{ ...c.dropdownDot, background: priorityColors[p]?.color || 'var(--muted)' }} />
+          {p === 'none' ? 'None' : p.charAt(0).toUpperCase() + p.slice(1)}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTitle, onMove, onDelete, onOpenDetail, onUpdateField, columns }: {
   task: Task
   col: typeof COLUMNS[0]
   isDragging: boolean
@@ -320,28 +354,43 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
   onMove: (id: string, status: string) => void
   onDelete: (id: string) => void
   onOpenDetail: () => void
+  onUpdateField: (field: string, value: string | null) => void
   columns: typeof COLUMNS
 }) {
-  const [editing, setEditing] = useState(false)
-  const [localTitle, setLocalTitle] = useState(task.title)
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [priorityOpen, setPriorityOpen] = useState(false)
+  const [dueDateOpen, setDueDateOpen] = useState(false)
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null)
 
   const isCompleted = task.status === 'completed'
-  const isInProgress = task.status === 'in_progress'
   const date = (isCompleted && task.completed_at)
     ? new Date(task.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : new Date(task.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
   const otherCols = columns.filter(c => c.id !== task.status)
 
-  function startEdit() { setEditing(true); setTimeout(() => inputRef.current?.focus(), 0) }
-  function commitEdit() {
-    setEditing(false)
-    const t = localTitle.trim()
-    if (t && t !== task.title) onUpdateTitle(t)
-    else setLocalTitle(task.title)
+  // Click anywhere on card opens modal, but only if not dragging
+  function handleCardClick(e: React.MouseEvent) {
+    // Don't open modal if clicking on interactive elements
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('input') || target.closest('[data-no-modal]')) return
+    onOpenDetail()
+  }
+
+  function handleMouseDown(e: React.MouseEvent) {
+    dragStartPos.current = { x: e.clientX, y: e.clientY }
+  }
+
+  function handleCardMouseUp(e: React.MouseEvent) {
+    if (!dragStartPos.current) return
+    const dx = Math.abs(e.clientX - dragStartPos.current.x)
+    const dy = Math.abs(e.clientY - dragStartPos.current.y)
+    // Only treat as click if mouse didn't move much (not a drag)
+    if (dx < 5 && dy < 5) {
+      handleCardClick(e)
+    }
+    dragStartPos.current = null
   }
 
   return (
@@ -349,13 +398,16 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleCardMouseUp}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setMenuOpen(false) }}
+      onMouseLeave={() => { setHovered(false); setMenuOpen(false); setPriorityOpen(false); setDueDateOpen(false) }}
       style={{
         ...c.card,
         ...(isDragging ? c.dragging : {}),
         ...(hovered && !isDragging ? c.hover : {}),
         borderLeftColor: col.accent,
+        cursor: 'pointer',
       }}
     >
       {/* Left accent stripe */}
@@ -363,42 +415,9 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
 
       <div style={c.body}>
         {/* Title */}
-        {editing ? (
-          <input
-            ref={inputRef}
-            value={localTitle}
-            onChange={e => setLocalTitle(e.target.value)}
-            onBlur={commitEdit}
-            onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') { setLocalTitle(task.title); setEditing(false) } }}
-            style={c.titleInput}
-          />
-        ) : (
-          <div
-            onClick={onOpenDetail}
-            style={{
-              ...c.title,
-              ...(isCompleted ? c.titleDone : {}),
-            }}
-          >
-            {localTitle || '(untitled)'}
-          </div>
-        )}
-
-        {/* Priority & Due Date */}
-        {(task.priority && task.priority !== 'none') || task.due_date ? (
-          <div style={c.metaRow}>
-            {task.priority && task.priority !== 'none' && (
-              <span style={{ ...c.priorityBadge, color: priorityColors[task.priority]?.color || '#94a3b8', background: priorityColors[task.priority]?.bg || 'rgba(148,163,184,0.1)' }}>
-                {task.priority}
-              </span>
-            )}
-            {task.due_date && (
-              <span style={c.dueBadge}>
-                {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            )}
-          </div>
-        ) : null}
+        <div style={{ ...c.title, ...(isCompleted ? c.titleDone : {}) }}>
+          {task.title || '(untitled)'}
+        </div>
 
         {/* Footer row */}
         <div style={c.footer}>
@@ -409,12 +428,56 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
           </span>
 
           <div style={c.footerRight}>
+            {/* Inline priority icon */}
+            <div style={{ position: 'relative' }} data-no-modal>
+              <PriorityIcon priority={task.priority || 'none'} onClick={(e) => { e.stopPropagation(); setPriorityOpen(v => !v); setDueDateOpen(false); setMenuOpen(false) }} />
+              {priorityOpen && (
+                <PriorityDropdown current={task.priority || 'none'} onSelect={(p) => { onUpdateField('priority', p); setPriorityOpen(false) }} />
+              )}
+            </div>
+
+            {/* Inline due date */}
+            <div style={{ position: 'relative' }} data-no-modal>
+              <button
+                onClick={(e) => { e.stopPropagation(); setDueDateOpen(v => !v); setPriorityOpen(false); setMenuOpen(false) }}
+                style={{ ...c.inlineBtn, color: task.due_date ? 'var(--text)' : 'var(--muted)' }}
+                title={task.due_date ? `Due: ${task.due_date}` : 'Set due date'}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <rect x="1.5" y="2.5" width="11" height="9.5" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M1.5 5.5h11" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M4.5 1v2M9.5 1v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+                {task.due_date && (
+                  <span style={c.dueDateText}>
+                    {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                )}
+              </button>
+              {dueDateOpen && (
+                <div style={c.dropdown} data-no-modal>
+                  <input
+                    type="date"
+                    value={task.due_date || ''}
+                    onChange={(e) => { onUpdateField('due_date', e.target.value || null); setDueDateOpen(false) }}
+                    style={c.datePickerInput}
+                    autoFocus
+                  />
+                  {task.due_date && (
+                    <button onClick={() => { onUpdateField('due_date', null); setDueDateOpen(false) }} style={{ ...c.dropdownItem, color: '#f87171', fontSize: '11px' }}>
+                      Clear date
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             <span style={c.date}>{date}</span>
 
             {/* More menu */}
             {hovered && (
-              <div style={{ position: 'relative' }}>
-                <button onClick={() => setMenuOpen(v => !v)} style={c.moreBtn}>
+              <div style={{ position: 'relative' }} data-no-modal>
+                <button onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); setPriorityOpen(false); setDueDateOpen(false) }} style={c.moreBtn}>
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                     <circle cx="6.5" cy="2.5" r="1.2" fill="currentColor"/>
                     <circle cx="6.5" cy="6.5" r="1.2" fill="currentColor"/>
@@ -624,15 +687,32 @@ const c: Record<string, React.CSSProperties> = {
   },
   menuDot: { width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0 },
   menuDivider: { height: '1px', background: 'var(--border)', margin: '4px 2px' },
-  metaRow: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' as const },
-  priorityBadge: {
-    fontSize: '10px', fontWeight: 600, textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em', padding: '2px 7px', borderRadius: '4px',
+  inlineBtn: {
+    background: 'none', border: 'none', color: 'var(--muted)',
+    cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', gap: '4px',
+    fontSize: '11px', fontFamily: 'inherit', borderRadius: '4px',
+    transition: 'color 0.15s',
   },
-  dueBadge: {
-    fontSize: '10px', fontWeight: 500, color: 'var(--muted)',
-    padding: '2px 7px', borderRadius: '4px',
-    background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
+  dueDateText: { fontSize: '10px', fontWeight: 500, whiteSpace: 'nowrap' as const },
+  dropdown: {
+    position: 'absolute' as const, right: 0, bottom: '24px',
+    background: 'var(--surface)', border: '1px solid var(--border2)',
+    borderRadius: '10px', padding: '4px', zIndex: 200, minWidth: '130px',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+  },
+  dropdownItem: {
+    display: 'flex', alignItems: 'center', gap: '7px',
+    width: '100%', background: 'none', border: 'none',
+    color: 'var(--muted)', fontSize: '12px', fontWeight: 500,
+    padding: '6px 8px', cursor: 'pointer', textAlign: 'left' as const,
+    borderRadius: '6px', fontFamily: 'inherit',
+  },
+  dropdownDot: { width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0 },
+  datePickerInput: {
+    background: 'var(--surface2)', border: '1px solid var(--border)',
+    borderRadius: '6px', padding: '6px 8px', fontSize: '12px',
+    color: 'var(--text)', fontFamily: 'inherit', width: '100%',
+    outline: 'none', colorScheme: 'dark', margin: '2px 0',
   },
 }
 

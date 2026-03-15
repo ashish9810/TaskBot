@@ -16,7 +16,7 @@ type StatusSection = {
 }
 
 function PersonAccordion({ uid, group, isMe }: { uid: string; group: Group; isMe: boolean }) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
   const sections: StatusSection[] = [
     { key: 'backlog', label: 'Inbox', color: '#f59e0b', accent: 'rgba(245,158,11,0.3)', bg: 'rgba(245,158,11,0.08)', tasks: group.tasks.filter(t => t.status === 'backlog') },
@@ -97,12 +97,19 @@ export default function AllTasksClient({ groups, mySlackIds }: {
   const [search, setSearch] = useState('')
   const myIds = new Set(mySlackIds)
 
+  // Sort: signed-in user always on top
+  const sorted = [...groups].sort((a, b) => {
+    const aIsMe = myIds.has(a[0]) ? 0 : 1
+    const bIsMe = myIds.has(b[0]) ? 0 : 1
+    return aIsMe - bIsMe
+  })
+
   const filtered = search.trim()
-    ? groups.filter(([, g]) => {
+    ? sorted.filter(([, g]) => {
         const q = search.toLowerCase()
         return g.name.toLowerCase().includes(q) || (g.email?.toLowerCase().includes(q) ?? false)
       })
-    : groups
+    : sorted
 
   const totalActive = filtered.reduce((sum, [, g]) =>
     sum + g.tasks.filter(t => t.status === 'backlog' || t.status === 'active' || t.status === 'in_progress').length, 0)
