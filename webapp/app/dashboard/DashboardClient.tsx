@@ -327,11 +327,24 @@ function PriorityIcon({ priority, onClick }: { priority: string; onClick: (e: Re
   )
 }
 
-function PriorityDropdown({ current, onSelect }: { current: string; onSelect: (p: string) => void }) {
+function PriorityDropdown({ current, onSelect, anchorRef }: { current: string; onSelect: (p: string) => void; anchorRef: React.RefObject<HTMLDivElement | null> }) {
   const options = ['none', 'low', 'medium', 'high', 'urgent'] as const
   const labels: Record<string, string> = { none: 'No priority', low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' }
+
+  // Position fixed relative to anchor
+  const rect = anchorRef.current?.getBoundingClientRect()
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    zIndex: 9999,
+    left: rect ? rect.left : 0,
+    bottom: rect ? window.innerHeight - rect.top + 6 : 0,
+    background: 'var(--surface)', border: '1px solid var(--border2)',
+    borderRadius: '10px', padding: '4px', minWidth: '160px',
+    boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+  }
+
   return (
-    <div style={{ ...c.dropdown, minWidth: '150px' }} onClick={(e) => e.stopPropagation()}>
+    <div style={style} onClick={(e) => e.stopPropagation()}>
       <div style={{ padding: '6px 8px', fontSize: '10px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Set priority</div>
       {options.map(p => {
         const isActive = (current || 'none') === p
@@ -375,6 +388,7 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
   const [priorityOpen, setPriorityOpen] = useState(false)
   const dragStartPos = useRef<{ x: number; y: number } | null>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
+  const priorityAnchorRef = useRef<HTMLDivElement>(null)
 
   const isCompleted = task.status === 'completed'
 
@@ -439,10 +453,10 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
 
           <div style={c.footerRight}>
             {/* Inline priority icon */}
-            <div style={{ position: 'relative' }} data-no-modal>
+            <div ref={priorityAnchorRef} style={{ position: 'relative' }} data-no-modal>
               <PriorityIcon priority={task.priority || 'none'} onClick={(e) => { e.stopPropagation(); setPriorityOpen(v => !v); setMenuOpen(false) }} />
               {priorityOpen && (
-                <PriorityDropdown current={task.priority || 'none'} onSelect={(p) => { onUpdateField('priority', p); setPriorityOpen(false) }} />
+                <PriorityDropdown current={task.priority || 'none'} onSelect={(p) => { onUpdateField('priority', p); setPriorityOpen(false) }} anchorRef={priorityAnchorRef} />
               )}
             </div>
 
