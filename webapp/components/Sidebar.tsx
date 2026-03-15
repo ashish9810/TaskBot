@@ -58,7 +58,7 @@ export default function Sidebar({ user, workspace, role }: Props) {
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.push('/login')
+    router.push('/home')
     router.refresh()
   }
 
