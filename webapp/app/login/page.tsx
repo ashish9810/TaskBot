@@ -47,23 +47,6 @@ function LoginForm() {
     const supabase = createClient()
 
     try {
-      // Check if this email has an account before attempting login
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', email.toLowerCase().trim())
-        .maybeSingle()
-
-      if (!profile) {
-        setLoading(false)
-        setErrors({
-          email: "We don't have an account with this email. Want to create one?",
-          general: 'no-account',
-        })
-        return
-      }
-
-      // Account exists — attempt login
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
@@ -74,6 +57,8 @@ function LoginForm() {
           setErrors({ general: 'unconfirmed' })
         } else if (msg.includes('too many requests') || msg.includes('rate limit')) {
           setErrors({ general: 'Too many attempts. Please wait a minute and try again.' })
+        } else if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
+          setErrors({ password: "Incorrect email or password. Try again or reset your password." })
         } else {
           setErrors({ password: "That password isn't correct for this account. Try again or reset your password." })
         }
