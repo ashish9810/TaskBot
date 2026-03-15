@@ -34,14 +34,23 @@ export default async function DashboardPage() {
   let tasks: Record<string, unknown>[] = []
 
   if (slackId && teamId) {
-    // Has Slack link: fetch tasks assigned to this user's slack_user_id
+    // Has Slack link: fetch tasks by slack_user_id OR profile_id (covers both origins)
     const { data } = await admin
       .from('tasks')
       .select('*')
-      .eq('user_id', slackId)
+      .or(`user_id.eq.${slackId},user_id.eq.${user.id}`)
       .not('status', 'eq', 'deleted')
       .order('created_at', { ascending: false })
     tasks = data || []
+
+    // Migrate any web-created tasks (profile_id) to use slack_user_id for Slack sync
+    const orphaned = (tasks || []).filter(t => t.user_id === user.id)
+    if (orphaned.length > 0) {
+      await admin
+        .from('tasks')
+        .update({ user_id: slackId, team_id: teamId })
+        .eq('user_id', user.id)
+    }
   } else {
     // Web-only: fetch tasks assigned to this user's profile_id
     const { data } = await admin
