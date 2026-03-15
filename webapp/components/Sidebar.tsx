@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase-browser'
 
 type Props = {
   user: { name: string; email: string }
-  workspace: { id: string; name: string; slackConnected: boolean } | null
+  workspace: { id: string; name: string; slackConnected: boolean; slackTeamId?: string | null; slackWorkspaceName?: string | null } | null
   role: 'owner' | 'member'
 }
 
@@ -133,10 +133,22 @@ export default function Sidebar({ user, workspace, role }: Props) {
         {workspace && !collapsed && (
           <div style={s.slackSection}>
             {workspace.slackConnected ? (
-              <div style={s.slackConnected}>
-                <span style={s.slackDot} />
-                Slack connected
-              </div>
+              <a
+                href={`https://app.slack.com/client/${workspace.slackTeamId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={s.slackConnectedBtn}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+                  <path d="M5.04 15.33a2.52 2.52 0 01-2.52 2.52A2.52 2.52 0 010 15.33a2.52 2.52 0 012.52-2.52h2.52v2.52zm1.26 0a2.52 2.52 0 012.52-2.52 2.52 2.52 0 012.52 2.52v6.3a2.52 2.52 0 01-2.52 2.52 2.52 2.52 0 01-2.52-2.52v-6.3zM8.82 5.04a2.52 2.52 0 01-2.52-2.52A2.52 2.52 0 018.82 0a2.52 2.52 0 012.52 2.52v2.52H8.82zm0 1.26a2.52 2.52 0 012.52 2.52 2.52 2.52 0 01-2.52 2.52H2.52A2.52 2.52 0 010 8.82a2.52 2.52 0 012.52-2.52h6.3zm10.29 2.52a2.52 2.52 0 012.52-2.52A2.52 2.52 0 0124 8.82a2.52 2.52 0 01-2.52 2.52h-2.52V8.82zm-1.26 0a2.52 2.52 0 01-2.52 2.52 2.52 2.52 0 01-2.52-2.52V2.52A2.52 2.52 0 0115.18 0a2.52 2.52 0 012.52 2.52v6.3zm-2.52 10.29a2.52 2.52 0 012.52 2.52A2.52 2.52 0 0115.18 24a2.52 2.52 0 01-2.52-2.52v-2.52h2.52zm0-1.26a2.52 2.52 0 01-2.52-2.52 2.52 2.52 0 012.52-2.52h6.3A2.52 2.52 0 0124 15.33a2.52 2.52 0 01-2.52 2.52h-6.3z"/>
+                </svg>
+                <span style={s.slackNameWrap}>
+                  <span style={s.slackName}>{workspace.slackWorkspaceName || 'Slack'}</span>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+                    <path d="M2.5 6.5L5 9l4.5-6" stroke="#4ade80" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </span>
+              </a>
             ) : role === 'owner' ? (
               <a href={`/api/slack/connect?workspace_id=${workspace.id}`} style={s.slackBtn}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
@@ -292,20 +304,32 @@ const s: Record<string, React.CSSProperties> = {
     textDecoration: 'none',
     whiteSpace: 'nowrap',
   },
-  slackConnected: {
+  slackConnectedBtn: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '8px',
+    background: 'rgba(74,222,128,0.06)',
+    border: '1px solid rgba(74,222,128,0.2)',
+    borderRadius: '8px',
+    padding: '8px 10px',
     fontSize: '12px',
-    color: '#4ade80',
-    padding: '4px 8px',
+    fontWeight: 500,
+    color: 'var(--text)',
+    textDecoration: 'none',
+    whiteSpace: 'nowrap' as const,
+    cursor: 'pointer',
   },
-  slackDot: {
-    width: '6px',
-    height: '6px',
-    borderRadius: '50%',
-    background: '#4ade80',
-    flexShrink: 0,
+  slackNameWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+    flex: 1,
+    overflow: 'hidden',
+  },
+  slackName: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
   },
   slackMuted: { fontSize: '11px', color: 'var(--muted)', padding: '4px 8px', lineHeight: 1.4 },
   userRow: {

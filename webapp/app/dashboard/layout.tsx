@@ -28,11 +28,22 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .eq('id', membership.workspace_id)
     .single()
 
+  // Fetch Slack workspace name if connected
+  let slackWorkspaceName: string | null = null
+  if (workspace?.slack_team_id) {
+    const { data: installation } = await admin
+      .from('installations')
+      .select('team_name')
+      .eq('team_id', workspace.slack_team_id)
+      .single()
+    slackWorkspaceName = installation?.team_name || null
+  }
+
   return (
     <div style={styles.shell}>
       <Sidebar
         user={{ name: profile?.name || user.email || 'User', email: profile?.email || user.email || '' }}
-        workspace={workspace ? { id: workspace.id, name: workspace.name, slackConnected: !!workspace.slack_team_id } : null}
+        workspace={workspace ? { id: workspace.id, name: workspace.name, slackConnected: !!workspace.slack_team_id, slackTeamId: workspace.slack_team_id, slackWorkspaceName } : null}
         role={membership.role as 'owner' | 'member'}
       />
       <main style={styles.main}>
