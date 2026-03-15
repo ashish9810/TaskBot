@@ -848,7 +848,8 @@ app.event('app_mention', async ({ event, client, body }) => {
   // Extract task title: everything after "assign @mention"
   const taskTitle = event.text
     .replace(/<@[A-Z0-9]+>/g, '')  // remove all mentions
-    .replace(/^assign\s*/i, '')     // remove "assign"
+    .trim()
+    .replace(/^assign\s*/i, '')     // remove "assign" from start
     .trim();
 
   if (!taskTitle) {
