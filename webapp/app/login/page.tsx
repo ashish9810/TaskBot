@@ -4,7 +4,6 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
-import { syncSlackIdentity } from '@/lib/sync'
 
 function LoginForm() {
   const router = useRouter()
@@ -79,9 +78,8 @@ function LoginForm() {
         return
       }
 
-      if (data.user) {
-        await syncSlackIdentity(supabase, data.user.id, data.user.email!)
-      }
+      // Sync Slack identity server-side (bypasses RLS)
+      await fetch('/api/auth/sync-slack', { method: 'POST' })
       router.push(nextUrl)
       router.refresh()
     } catch {

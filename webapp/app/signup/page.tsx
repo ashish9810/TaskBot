@@ -4,7 +4,6 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
-import { syncSlackIdentity } from '@/lib/sync'
 
 type Screen = 'form' | 'check-email'
 
@@ -83,7 +82,7 @@ function SignupForm() {
       // Email confirmation disabled — user is logged in immediately
       if (data.user) {
         await supabase.from('profiles').upsert({ id: data.user.id, email, name })
-        await syncSlackIdentity(supabase, data.user.id, email)
+        await fetch('/api/auth/sync-slack', { method: 'POST' })
       }
       router.push(nextUrl)
       router.refresh()

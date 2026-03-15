@@ -22,6 +22,22 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!membership) redirect('/onboarding')
 
+  // Ensure Slack identity is linked (runs every dashboard load, upsert is idempotent)
+  if (profile?.email) {
+    const { data: slackUsers } = await admin
+      .from('users')
+      .select('slack_user_id, team_id')
+      .eq('email', profile.email)
+    if (slackUsers && slackUsers.length > 0) {
+      await admin
+        .from('profile_slack_links')
+        .upsert(
+          slackUsers.map(u => ({ profile_id: user.id, slack_user_id: u.slack_user_id, team_id: u.team_id })),
+          { onConflict: 'slack_user_id,team_id' }
+        )
+    }
+  }
+
   const { data: workspace } = await admin
     .from('workspaces')
     .select('id, name, slack_team_id')
