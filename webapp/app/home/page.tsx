@@ -8,7 +8,6 @@ export const metadata: Metadata = {
   description: 'Assign tasks from Slack, track progress on a beautiful dashboard. Free for small teams. No credit card required.',
 }
 
-const SLACK_INSTALL_URL = 'https://taskbot-142i.onrender.com/slack/install'
 
 export default function HomePage() {
   return (
@@ -66,12 +65,12 @@ export default function HomePage() {
             <Link href="/signup" className="cta-primary" style={s.ctaPrimary}>
               Sign up free
             </Link>
-            <a href={SLACK_INSTALL_URL} style={s.ctaSecondary}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, opacity: 0.7 }}>
+            <span style={s.ctaHint}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, opacity: 0.5 }}>
                 <path d="M5.04 15.33a2.52 2.52 0 01-2.52 2.52A2.52 2.52 0 010 15.33a2.52 2.52 0 012.52-2.52h2.52v2.52zm1.26 0a2.52 2.52 0 012.52-2.52 2.52 2.52 0 012.52 2.52v6.3a2.52 2.52 0 01-2.52 2.52 2.52 2.52 0 01-2.52-2.52v-6.3zM8.82 5.04a2.52 2.52 0 01-2.52-2.52A2.52 2.52 0 018.82 0a2.52 2.52 0 012.52 2.52v2.52H8.82zm0 1.26a2.52 2.52 0 012.52 2.52 2.52 2.52 0 01-2.52 2.52H2.52A2.52 2.52 0 010 8.82a2.52 2.52 0 012.52-2.52h6.3zm10.29 2.52a2.52 2.52 0 012.52-2.52A2.52 2.52 0 0124 8.82a2.52 2.52 0 01-2.52 2.52h-2.52V8.82zm-1.26 0a2.52 2.52 0 01-2.52 2.52 2.52 2.52 0 01-2.52-2.52V2.52A2.52 2.52 0 0115.18 0a2.52 2.52 0 012.52 2.52v6.3zm-2.52 10.29a2.52 2.52 0 012.52 2.52A2.52 2.52 0 0115.18 24a2.52 2.52 0 01-2.52-2.52v-2.52h2.52zm0-1.26a2.52 2.52 0 01-2.52-2.52 2.52 2.52 0 012.52-2.52h6.3A2.52 2.52 0 0124 15.33a2.52 2.52 0 01-2.52 2.52h-6.3z"/>
               </svg>
-              Add to Slack
-            </a>
+              Connect Slack after signup
+            </span>
           </div>
 
           {/* Trust */}
@@ -286,7 +285,7 @@ export default function HomePage() {
               Sign up free — it takes 30 seconds
             </Link>
             <p style={s.ctaSubLink}>
-              or <a href={SLACK_INSTALL_URL} style={s.ctaSubA}>add Ping to Slack</a>
+              Connect Slack after signup to supercharge your workflow
             </p>
           </div>
         </div>
@@ -307,7 +306,7 @@ export default function HomePage() {
             <a href="#features" style={s.footerLink}>Features</a>
             <a href="#how-it-works" style={s.footerLink}>How it works</a>
             <Link href="/login" style={s.footerLink}>Dashboard</Link>
-            <a href={SLACK_INSTALL_URL} style={s.footerLink}>Add to Slack</a>
+            <Link href="/signup" style={s.footerLink}>Sign up free</Link>
           </div>
           <div>
             <h4 style={s.footerHeading}>Legal</h4>
@@ -392,12 +391,11 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '16px', fontWeight: 700, textDecoration: 'none',
     boxShadow: '0 4px 20px rgba(124,92,252,0.2)',
   },
-  ctaSecondary: {
+  ctaHint: {
     display: 'inline-flex', alignItems: 'center', gap: '8px',
-    color: 'rgba(238,238,248,0.5)',
-    padding: '14px 24px', borderRadius: '10px',
-    fontSize: '15px', fontWeight: 500, textDecoration: 'none',
-    border: '1px solid rgba(255,255,255,0.1)',
+    color: 'rgba(238,238,248,0.35)',
+    padding: '14px 0',
+    fontSize: '14px', fontWeight: 500,
   },
   trustRow: {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px',
