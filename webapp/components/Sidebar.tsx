@@ -54,8 +54,10 @@ export default function Sidebar({ user, workspace, role }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   async function handleSignOut() {
+    setSigningOut(true)
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/home')
@@ -190,13 +192,18 @@ export default function Sidebar({ user, workspace, role }: Props) {
         )}
         <button
           onClick={handleSignOut}
-          style={{ ...s.signOutBtn, justifyContent: collapsed ? 'center' : 'flex-start', padding: collapsed ? '8px' : '8px 12px' }}
+          disabled={signingOut}
+          style={{ ...s.signOutBtn, justifyContent: collapsed ? 'center' : 'flex-start', padding: collapsed ? '8px' : '8px 12px', opacity: signingOut ? 0.5 : 1 }}
           title={collapsed ? 'Sign out' : undefined}
         >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-            <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          {!collapsed && <span>Sign out</span>}
+          {signingOut ? (
+            <span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid var(--border)', borderTopColor: 'var(--muted)', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          )}
+          {!collapsed && <span>{signingOut ? 'Signing out...' : 'Sign out'}</span>}
         </button>
       </div>
     </aside>

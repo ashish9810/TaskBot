@@ -75,7 +75,7 @@ export default function JoinClient({ token, workspaceName, isLoggedIn, userId }:
             disabled={joining}
             style={{ ...s.btn, ...(joining ? s.btnDisabled : {}) }}
           >
-            {joining ? 'Joining…' : `Join ${workspaceName}`}
+            {joining ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Joining...</span> : `Join ${workspaceName}`}
           </button>
         ) : (
           <div style={s.authBtns}>

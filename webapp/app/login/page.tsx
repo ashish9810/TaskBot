@@ -88,6 +88,8 @@ function LoginForm() {
     }
   }
 
+  const [forgotLoading, setForgotLoading] = useState(false)
+
   async function handleForgotPassword() {
     if (!email.trim()) {
       setErrors({ email: 'Enter your email above first, then click "Forgot password?".' })
@@ -98,6 +100,7 @@ function LoginForm() {
       return
     }
 
+    setForgotLoading(true)
     const supabase = createClient()
 
     try {
@@ -106,6 +109,7 @@ function LoginForm() {
       })
       router.push(`/login?message=If an account exists with ${email}, we've sent a password reset link. Check your inbox (and spam folder).`)
     } catch {
+      setForgotLoading(false)
       setErrors({ general: 'Network error. Check your internet connection and try again.' })
     }
   }
@@ -162,7 +166,7 @@ function LoginForm() {
           <div style={s.field}>
             <div style={s.labelRow}>
               <label style={s.label}>Password</label>
-              <button type="button" onClick={handleForgotPassword} style={s.forgotBtn}>Forgot password?</button>
+              <button type="button" onClick={handleForgotPassword} disabled={forgotLoading} style={{ ...s.forgotBtn, opacity: forgotLoading ? 0.5 : 1 }}>{forgotLoading ? 'Sending...' : 'Forgot password?'}</button>
             </div>
             <div style={s.pwWrap}>
               <input

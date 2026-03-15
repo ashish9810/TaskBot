@@ -301,9 +301,10 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
 
 function QuickAddCard({ onAdd, onCancel, accentColor }: { onAdd: (t: string) => void; onCancel: () => void; accentColor: string }) {
   const [value, setValue] = useState('')
+  const [adding, setAdding] = useState(false)
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => { ref.current?.focus() }, [])
-  function commit() { if (value.trim()) onAdd(value.trim()); else onCancel() }
+  function commit() { if (value.trim()) { setAdding(true); onAdd(value.trim()) } else onCancel() }
   return (
     <div style={{ ...qa.card, borderColor: `${accentColor}50` }} className="fadeSlideIn">
       <input
@@ -317,10 +318,10 @@ function QuickAddCard({ onAdd, onCancel, accentColor }: { onAdd: (t: string) => 
       <div style={qa.actions}>
         <button
           onClick={commit}
-          disabled={!value.trim()}
-          style={{ ...qa.addBtn, background: accentColor, opacity: value.trim() ? 1 : 0.4 }}
+          disabled={!value.trim() || adding}
+          style={{ ...qa.addBtn, background: accentColor, opacity: (!value.trim() || adding) ? 0.5 : 1 }}
         >
-          Add
+          {adding ? 'Adding...' : 'Add'}
         </button>
         <button onClick={onCancel} style={qa.cancelBtn}>Esc</button>
       </div>
@@ -942,7 +943,10 @@ function TaskDetailModal({ task, onClose, onUpdateField, onStatusChange, onTitle
 
             {/* Updates */}
             {loadingUpdates ? (
-              <div style={{ padding: '12px 0 12px 30px', color: 'var(--muted)', fontSize: '13px' }}>Loading...</div>
+              <div style={{ padding: '16px 0 16px 30px', color: 'var(--muted)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                Loading updates...
+              </div>
             ) : updates.map((upd, i) => (
               <div key={upd.id} style={m.timelineItem}>
                 <div style={m.timelineNodeWrap}>
