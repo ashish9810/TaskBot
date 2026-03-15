@@ -477,7 +477,7 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
             {/* More menu */}
             {hovered && (
               <div style={{ position: 'relative' }} data-no-modal>
-                <button onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); setPriorityOpen(false); setDueDateOpen(false) }} style={c.moreBtn}>
+                <button onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); setPriorityOpen(false) }} style={c.moreBtn}>
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                     <circle cx="6.5" cy="2.5" r="1.2" fill="currentColor"/>
                     <circle cx="6.5" cy="6.5" r="1.2" fill="currentColor"/>
