@@ -36,10 +36,12 @@ const receiver = new ExpressReceiver({
     callbackOptions: {
       success: (installation, _options, _req, res) => {
         const teamId = installation.team?.id || installation.enterprise?.id || '';
-        res.redirect(`http://localhost:3001/api/slack/callback?team_id=${teamId}`);
+        const webUrl = process.env.WEB_URL || 'http://localhost:3001';
+        res.redirect(`${webUrl}/api/slack/callback?team_id=${teamId}`);
       },
       failure: (_error, _options, _req, res) => {
-        res.redirect('http://localhost:3001/dashboard');
+        const webUrlFail = process.env.WEB_URL || 'http://localhost:3001';
+        res.redirect(`${webUrlFail}/dashboard`);
       }
     }
   },
