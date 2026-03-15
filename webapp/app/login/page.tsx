@@ -126,7 +126,7 @@ function LoginForm() {
   return (
     <div style={s.page}>
       <div style={s.card}>
-        <div style={s.logoRow}><span style={s.logo}>Ping</span></div>
+        <div style={s.logoRow}><Link href="/home" style={{ textDecoration: 'none' }}><span style={s.logo}>Ping</span></Link></div>
         <h1 style={s.title}>Welcome back</h1>
         <p style={s.subtitle}>Sign in to your account</p>
 

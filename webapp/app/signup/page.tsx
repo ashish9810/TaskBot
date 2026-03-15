@@ -149,7 +149,7 @@ function SignupForm() {
   return (
     <div style={s.page}>
       <div style={s.card}>
-        <div style={s.logoRow}><span style={s.logo}>Ping</span></div>
+        <div style={s.logoRow}><a href="/home" style={{ textDecoration: 'none' }}><span style={s.logo}>Ping</span></a></div>
         <h1 style={s.title}>Create your account</h1>
         <p style={s.subtitle}>Free to get started — no credit card needed</p>
 
