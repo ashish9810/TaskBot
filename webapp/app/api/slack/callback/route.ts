@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       .eq('id', workspaceId)
   }
 
-  const response = NextResponse.redirect(new URL('/dashboard', req.url))
+  const response = NextResponse.redirect(new URL('/dashboard?slack_connected=true', req.url))
   response.cookies.delete('pending_workspace_id')
   return response
 }

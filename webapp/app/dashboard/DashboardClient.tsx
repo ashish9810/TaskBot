@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 export type Task = {
   id: string
@@ -70,7 +71,18 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [quickAddCol, setQuickAddCol] = useState<string | null>(null)
   const [detailTask, setDetailTask] = useState<Task | null>(null)
+  const [showSlackToast, setShowSlackToast] = useState(false)
   const dragTask = useRef<Task | null>(null)
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('slack_connected') === 'true') {
+      setShowSlackToast(true)
+      // Remove query param from URL without reload
+      window.history.replaceState({}, '', '/dashboard')
+      setTimeout(() => setShowSlackToast(false), 5000)
+    }
+  }, [searchParams])
 
   const grouped = {
     backlog:     tasks.filter(t => t.status === 'backlog'),
@@ -158,6 +170,20 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
 
   return (
     <div style={s.root}>
+      {/* Slack connected toast */}
+      {showSlackToast && (
+        <div style={s.toast}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+            <circle cx="8" cy="8" r="7" fill="#22c55e" opacity="0.15"/>
+            <path d="M5 8.5L7 10.5L11 5.5" stroke="#4ade80" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Slack connected successfully! Your team members will sync automatically.
+          <button onClick={() => setShowSlackToast(false)} style={s.toastClose}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+      )}
+
       {/* Page header */}
       <div style={s.header}>
         <div style={s.headerLeft}>
@@ -505,6 +531,19 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
 
 const s: Record<string, React.CSSProperties> = {
   root: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
+
+  toast: {
+    display: 'flex', alignItems: 'center', gap: '10px',
+    background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)',
+    borderRadius: '10px', padding: '12px 16px',
+    fontSize: '13px', fontWeight: 500, color: '#4ade80',
+    marginBottom: '16px', animation: 'fadeSlideIn 0.3s ease',
+  },
+  toastClose: {
+    marginLeft: 'auto', background: 'none', border: 'none',
+    color: 'rgba(74,222,128,0.5)', cursor: 'pointer', padding: '2px',
+    display: 'flex', flexShrink: 0,
+  },
 
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' },
   headerLeft: { display: 'flex', alignItems: 'center', gap: '12px' },
