@@ -329,17 +329,30 @@ function PriorityIcon({ priority, onClick }: { priority: string; onClick: (e: Re
 
 function PriorityDropdown({ current, onSelect }: { current: string; onSelect: (p: string) => void }) {
   const options = ['none', 'low', 'medium', 'high', 'urgent'] as const
+  const labels: Record<string, string> = { none: 'No priority', low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' }
   return (
-    <div style={c.dropdown}>
-      {options.map(p => (
-        <button key={p} onClick={() => onSelect(p)} style={{
-          ...c.dropdownItem,
-          ...(current === p ? { background: 'var(--surface3)', color: 'var(--text)' } : {}),
-        }}>
-          <span style={{ ...c.dropdownDot, background: priorityColors[p]?.color || 'var(--muted)' }} />
-          {p === 'none' ? 'None' : p.charAt(0).toUpperCase() + p.slice(1)}
-        </button>
-      ))}
+    <div style={{ ...c.dropdown, minWidth: '150px' }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ padding: '6px 8px', fontSize: '10px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Set priority</div>
+      {options.map(p => {
+        const isActive = (current || 'none') === p
+        const pColor = priorityColors[p]?.color || 'var(--muted)'
+        const bars = p === 'urgent' ? 4 : p === 'high' ? 3 : p === 'medium' ? 2 : p === 'low' ? 1 : 0
+        return (
+          <button key={p} onClick={() => onSelect(p)} style={{
+            ...c.dropdownItem,
+            ...(isActive ? { background: 'var(--surface3)', color: 'var(--text)' } : {}),
+          }}>
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+              {[0,1,2,3].map(i => (
+                <rect key={i} x={1 + i * 3.5} y={10 - (i + 1) * 2.2} width="2.5" height={(i + 1) * 2.2}
+                  rx="0.5" fill={i < bars ? pColor : 'rgba(255,255,255,0.08)'} />
+              ))}
+            </svg>
+            <span style={{ color: isActive ? pColor : undefined }}>{labels[p]}</span>
+            {isActive && <span style={{ marginLeft: 'auto', fontSize: '10px' }}>✓</span>}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -448,23 +461,24 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
                   <path d="M1.5 5.5h11" stroke="currentColor" strokeWidth="1.2"/>
                   <path d="M4.5 1v2M9.5 1v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                 </svg>
-                {task.due_date && (
-                  <span style={c.dueDateText}>
-                    {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
-                )}
+                <span style={c.dueDateText}>
+                  {task.due_date
+                    ? new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : 'Due Date'}
+                </span>
               </button>
               {dueDateOpen && (
-                <div style={c.dropdown} data-no-modal>
+                <div style={{ ...c.dropdown, minWidth: '160px' }} data-no-modal>
+                  <div style={{ padding: '6px 8px', fontSize: '10px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Set due date</div>
                   <input
                     type="date"
                     value={task.due_date || ''}
                     onChange={(e) => { onUpdateField('due_date', e.target.value || null); setDueDateOpen(false) }}
                     style={c.datePickerInput}
-                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
                   />
                   {task.due_date && (
-                    <button onClick={() => { onUpdateField('due_date', null); setDueDateOpen(false) }} style={{ ...c.dropdownItem, color: '#f87171', fontSize: '11px' }}>
+                    <button onClick={(e) => { e.stopPropagation(); onUpdateField('due_date', null); setDueDateOpen(false) }} style={{ ...c.dropdownItem, color: '#f87171', fontSize: '11px' }}>
                       Clear date
                     </button>
                   )}
@@ -695,7 +709,8 @@ const c: Record<string, React.CSSProperties> = {
   },
   dueDateText: { fontSize: '10px', fontWeight: 500, whiteSpace: 'nowrap' as const },
   dropdown: {
-    position: 'absolute' as const, right: 0, bottom: '24px',
+    position: 'absolute' as const, left: '50%', bottom: '100%', transform: 'translateX(-50%)',
+    marginBottom: '6px',
     background: 'var(--surface)', border: '1px solid var(--border2)',
     borderRadius: '10px', padding: '4px', zIndex: 200, minWidth: '130px',
     boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
