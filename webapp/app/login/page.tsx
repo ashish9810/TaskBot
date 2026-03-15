@@ -47,8 +47,21 @@ function LoginForm() {
     const supabase = createClient()
 
     try {
-      // First check if account exists by attempting a dummy OTP sign-in
-      // Supabase returns different errors for non-existent vs existing accounts
+      // Check if account exists first
+      const checkRes = await fetch('/api/auth/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      })
+      const { exists } = await checkRes.json()
+
+      if (!exists) {
+        setLoading(false)
+        setErrors({ general: 'no-account' })
+        return
+      }
+
+      // Account exists — attempt login
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
@@ -56,26 +69,12 @@ function LoginForm() {
         const msg = error.message.toLowerCase()
 
         if (msg.includes('email not confirmed')) {
-          // Account exists but email not verified
           setResendEmail(email)
           setErrors({ general: 'unconfirmed' })
         } else if (msg.includes('too many requests') || msg.includes('rate limit') || msg.includes('over_email_send_rate_limit')) {
           setErrors({ general: 'Too many attempts. Please wait a minute and try again.' })
-        } else if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
-          // Supabase returns the same error for wrong password AND non-existent account
-          // Try to check if the account exists via a password reset (doesn't reveal info to attackers but helps UX)
-          const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
-          })
-          // If rate limited on reset, the account likely exists — show generic error
-          if (resetError && (resetError.message.toLowerCase().includes('rate') || resetError.message.toLowerCase().includes('too many'))) {
-            setErrors({ general: 'no-account-or-wrong-pw' })
-          } else {
-            // Show helpful message — either account doesn't exist or wrong password
-            setErrors({ general: 'no-account-or-wrong-pw' })
-          }
         } else {
-          setErrors({ password: "Something went wrong. Please try again." })
+          setErrors({ password: "Incorrect password. Try again or reset your password." })
         }
         return
       }
@@ -183,7 +182,7 @@ function LoginForm() {
             {errors.password && <p style={s.fieldErr}>{errors.password}</p>}
           </div>
 
-          {errors.general && errors.general !== 'no-account-or-wrong-pw' && errors.general !== 'unconfirmed' && (
+          {errors.general && errors.general !== 'no-account' && errors.general !== 'unconfirmed' && (
             <div style={s.errBox}>
               <span>⚠️</span>
               <span>{errors.general}</span>
@@ -206,23 +205,14 @@ function LoginForm() {
             </div>
           )}
 
-          {errors.general === 'no-account-or-wrong-pw' && (
+          {errors.general === 'no-account' && (
             <div style={s.noAccountBox}>
               <p style={s.noAccountText}>
-                We couldn&apos;t sign you in. This could mean:
+                No account found with <strong style={{ color: 'var(--text)' }}>{email}</strong>. Please sign up first.
               </p>
-              <ul style={s.helpList}>
-                <li>Your password is incorrect</li>
-                <li>No account exists with this email</li>
-              </ul>
-              <div style={s.helpActions}>
-                <button type="button" onClick={handleForgotPassword} style={s.helpBtn}>
-                  Reset password
-                </button>
-                <Link href={`/signup?email=${encodeURIComponent(email)}`} style={s.helpBtn}>
-                  Create new account
-                </Link>
-              </div>
+              <Link href={`/signup?email=${encodeURIComponent(email)}`} style={s.signupCta}>
+                Create a free account →
+              </Link>
             </div>
           )}
 
@@ -272,10 +262,8 @@ const s: Record<string, React.CSSProperties> = {
   switchText: { marginTop: '24px', textAlign: 'center', fontSize: '14px', color: 'var(--muted)' },
   link: { color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 },
   noAccountBox: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px 16px', display: 'flex', flexDirection: 'column' as const, gap: '10px' },
-  noAccountText: { fontSize: '13px', color: 'var(--muted)', fontWeight: 500 },
-  helpList: { fontSize: '12px', color: 'var(--muted)', margin: 0, paddingLeft: '18px', lineHeight: 1.7 },
-  helpActions: { display: 'flex', gap: '8px' },
-  helpBtn: { flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px', fontSize: '12px', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', textAlign: 'center' as const },
+  noAccountText: { fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5 },
+  signupCta: { fontSize: '14px', fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' },
   resendBtn: { background: 'rgba(124,92,252,0.15)', border: '1px solid rgba(124,92,252,0.3)', borderRadius: '6px', padding: '8px 12px', fontSize: '12px', color: 'rgba(240,240,248,0.85)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' as const, transition: 'opacity 0.2s' },
   resendBtnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
 }
