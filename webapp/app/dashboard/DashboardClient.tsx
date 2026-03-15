@@ -386,7 +386,6 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [priorityOpen, setPriorityOpen] = useState(false)
-  const dragStartPos = useRef<{ x: number; y: number } | null>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
   const priorityAnchorRef = useRef<HTMLDivElement>(null)
 
@@ -394,36 +393,16 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
 
   const otherCols = columns.filter(c => c.id !== task.status)
 
-  // Click anywhere on card opens modal, but only if not dragging
-  function handleCardClick(e: React.MouseEvent) {
-    // Don't open modal if clicking on interactive elements
-    const target = e.target as HTMLElement
-    if (target.closest('button') || target.closest('input') || target.closest('[data-no-modal]')) return
-    onOpenDetail()
-  }
-
-  function handleMouseDown(e: React.MouseEvent) {
-    dragStartPos.current = { x: e.clientX, y: e.clientY }
-  }
-
-  function handleCardMouseUp(e: React.MouseEvent) {
-    if (!dragStartPos.current) return
-    const dx = Math.abs(e.clientX - dragStartPos.current.x)
-    const dy = Math.abs(e.clientY - dragStartPos.current.y)
-    // Only treat as click if mouse didn't move much (not a drag)
-    if (dx < 5 && dy < 5) {
-      handleCardClick(e)
-    }
-    dragStartPos.current = null
-  }
-
   return (
     <div
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleCardMouseUp}
+      onClick={(e) => {
+        const target = e.target as HTMLElement
+        if (target.closest('button') || target.closest('input') || target.closest('[data-no-modal]')) return
+        onOpenDetail()
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setMenuOpen(false); setPriorityOpen(false) }}
       style={{
