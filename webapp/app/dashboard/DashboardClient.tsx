@@ -591,7 +591,7 @@ const s: Record<string, React.CSSProperties> = {
     borderColor: 'var(--border)',
     overflow: 'hidden',
     transition: 'border-color 0.2s, box-shadow 0.2s',
-    maxHeight: 'calc(100vh - 300px)',
+    maxHeight: 'calc(100vh - 180px)',
   },
   columnOver: { borderColor: 'rgba(124,92,252,0.5)' },
 
@@ -622,8 +622,8 @@ const s: Record<string, React.CSSProperties> = {
   },
 
   cardsList: {
-    display: 'flex', flexDirection: 'column', gap: '8px',
-    padding: '4px 12px 12px',
+    display: 'flex', flexDirection: 'column', gap: '12px',
+    padding: '8px 12px 16px',
     overflowY: 'auto', flex: 1,
   },
 
