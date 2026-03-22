@@ -109,7 +109,7 @@ export default function TaskCard({ task, readonly = false, onUpdate }: Props) {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  card: { display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' },
+  card: { display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px', minHeight: '44px', flexShrink: 0 },
   dotBtn: { background: 'none', border: 'none', padding: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   dot: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, transition: 'background 0.2s' },
   titleWrap: { flex: 1, minWidth: 0 },

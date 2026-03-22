@@ -115,50 +115,59 @@ export default function AllTasksClient({ groups, mySlackIds }: {
     sum + g.tasks.filter(t => t.status === 'backlog' || t.status === 'active' || t.status === 'in_progress').length, 0)
 
   return (
-    <div>
-      <div style={s.header}>
-        <h1 style={s.heading}>All Tasks</h1>
-        <span style={s.headerBadge}>{totalActive} active</span>
+    <div style={s.root}>
+      <div style={s.topBar}>
+        <div style={s.header}>
+          <h1 style={s.heading}>All Tasks</h1>
+          <span style={s.headerBadge}>{totalActive} active</span>
+        </div>
+
+        {/* Search */}
+        <div style={s.searchWrap}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={s.searchIcon}>
+            <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M11 11l3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or email..."
+            style={s.searchInput}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={s.clearBtn}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Search */}
-      <div style={s.searchWrap}>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={s.searchIcon}>
-          <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
-          <path d="M11 11l3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search by name or email..."
-          style={s.searchInput}
-        />
-        {search && (
-          <button onClick={() => setSearch('')} style={s.clearBtn}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </button>
+      <div style={s.scrollArea}>
+        {filtered.length === 0 ? (
+          <div style={s.empty}>
+            <p style={s.emptyTitle}>{search ? 'No matching members' : 'No tasks yet'}</p>
+            <p style={s.emptyText}>{search ? `No members match "${search}"` : 'Tasks created by team members will appear here.'}</p>
+          </div>
+        ) : (
+          <div style={s.groups}>
+            {filtered.map(([uid, group]) => (
+              <PersonAccordion key={uid} uid={uid} group={group} isMe={myIds.has(uid)} />
+            ))}
+          </div>
         )}
       </div>
-
-      {filtered.length === 0 ? (
-        <div style={s.empty}>
-          <p style={s.emptyTitle}>{search ? 'No matching members' : 'No tasks yet'}</p>
-          <p style={s.emptyText}>{search ? `No members match "${search}"` : 'Tasks created by team members will appear here.'}</p>
-        </div>
-      ) : (
-        <div style={s.groups}>
-          {filtered.map(([uid, group]) => (
-            <PersonAccordion key={uid} uid={uid} group={group} isMe={myIds.has(uid)} />
-          ))}
-        </div>
-      )}
     </div>
   )
 }
 
 const s: Record<string, React.CSSProperties> = {
+  // Layout — fixed viewport, scroll inside
+  root: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, flex: 1 },
+  topBar: { flexShrink: 0 },
+  scrollArea: { flex: 1, overflowY: 'auto', minHeight: 0, paddingBottom: '32px' },
+
   header: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' },
   heading: { fontSize: '22px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)' },
   headerBadge: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '100px', padding: '3px 10px', fontSize: '12px', color: 'var(--muted)' },
@@ -166,7 +175,7 @@ const s: Record<string, React.CSSProperties> = {
   searchWrap: {
     display: 'flex', alignItems: 'center', gap: '8px',
     background: 'var(--surface2)', border: '1px solid var(--border)',
-    borderRadius: '10px', padding: '8px 12px', marginBottom: '24px',
+    borderRadius: '10px', padding: '8px 12px', marginBottom: '20px',
   },
   searchIcon: { color: 'var(--muted)', flexShrink: 0 },
   searchInput: {
@@ -184,7 +193,7 @@ const s: Record<string, React.CSSProperties> = {
   // Person accordion
   person: {
     background: 'var(--surface)', border: '1px solid var(--border)',
-    borderRadius: '14px', overflow: 'hidden',
+    borderRadius: '14px',
   },
   personHeader: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -198,21 +207,21 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'transform 0.15s',
   },
   avatar: {
-    width: '30px', height: '30px', borderRadius: '50%',
+    width: '32px', height: '32px', borderRadius: '50%',
     background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: '13px', fontWeight: 700, color: 'white', flexShrink: 0,
   },
   personName: { fontSize: '15px', fontWeight: 600, color: 'var(--text)' },
-  badges: { display: 'flex', gap: '6px', flexWrap: 'wrap' as const },
+  badges: { display: 'flex', gap: '8px', flexWrap: 'wrap' as const },
   countBadge: {
-    fontSize: '11px', fontWeight: 500,
-    border: '1px solid', borderRadius: '100px', padding: '1px 8px',
+    fontSize: '12px', fontWeight: 700,
+    border: '1px solid', borderRadius: '100px', padding: '3px 10px',
   },
   totalBadge: {
-    fontSize: '11px', fontWeight: 600, color: 'var(--accent-light)',
-    background: 'rgba(124,92,252,0.1)', border: '1px solid rgba(124,92,252,0.25)',
-    borderRadius: '100px', padding: '1px 8px',
+    fontSize: '12px', fontWeight: 700, color: 'var(--accent-light)',
+    background: 'rgba(124,92,252,0.15)', border: '1px solid rgba(124,92,252,0.3)',
+    borderRadius: '100px', padding: '3px 10px',
   },
 
   // Expanded sections
@@ -224,7 +233,7 @@ const s: Record<string, React.CSSProperties> = {
   // Status accordion
   statusSection: {
     background: 'var(--surface2)', border: '1px solid var(--border)',
-    borderRadius: '10px', overflow: 'hidden',
+    borderRadius: '10px',
   },
   statusHeader: {
     display: 'flex', alignItems: 'center', gap: '8px',
@@ -235,15 +244,15 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--muted)', flexShrink: 0,
     transition: 'transform 0.15s',
   },
-  statusDot: { width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0 },
+  statusDot: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0 },
   statusLabel: { fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.04em' },
   statusCount: {
-    fontSize: '11px', color: 'var(--muted)',
+    fontSize: '11px', fontWeight: 600, color: 'var(--muted)',
     background: 'var(--surface)', borderRadius: '100px',
-    padding: '0 6px', marginLeft: '2px',
+    padding: '1px 8px', marginLeft: '2px',
   },
 
-  taskList: { padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: '4px' },
+  taskList: { padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: '6px' },
 
   empty: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', padding: '48px 32px', textAlign: 'center' },
   emptyTitle: { fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' },
