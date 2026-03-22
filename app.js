@@ -141,6 +141,8 @@ const receiver = new ExpressReceiver({
         ? installQuery.enterpriseId
         : installQuery.teamId;
       await supabase.from('installations').delete().eq('team_id', teamId);
+      await supabase.from('workspaces').update({ slack_team_id: null }).eq('slack_team_id', teamId);
+      console.log(`✅ Slack disconnected for team ${teamId} — workspace unlinked`);
     }
   }
 });
@@ -1822,6 +1824,25 @@ app.action('standup_go_back', async ({ ack, body, client }) => {
       }
     ]
   });
+});
+
+
+// =============================
+// SLACK APP UNINSTALL — sync with web dashboard
+// =============================
+
+app.event('app_uninstalled', async ({ body }) => {
+  const teamId = body.team_id || '';
+  console.log(`[app_uninstalled] Team ${teamId} uninstalled Ping`);
+  await supabase.from('installations').delete().eq('team_id', teamId);
+  await supabase.from('workspaces').update({ slack_team_id: null }).eq('slack_team_id', teamId);
+});
+
+app.event('tokens_revoked', async ({ body }) => {
+  const teamId = body.team_id || '';
+  console.log(`[tokens_revoked] Tokens revoked for team ${teamId}`);
+  await supabase.from('installations').delete().eq('team_id', teamId);
+  await supabase.from('workspaces').update({ slack_team_id: null }).eq('slack_team_id', teamId);
 });
 
 

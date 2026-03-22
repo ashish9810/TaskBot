@@ -53,7 +53,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
       .select('team_name')
       .eq('team_id', workspace.slack_team_id)
       .single()
-    slackWorkspaceName = installation?.team_name || null
+
+    if (installation) {
+      slackWorkspaceName = installation.team_name || null
+    } else {
+      // Installation was deleted (app uninstalled from Slack) — clean up stale link
+      await admin.from('workspaces').update({ slack_team_id: null }).eq('id', workspace.id)
+      workspace.slack_team_id = null
+    }
   }
 
   return (
