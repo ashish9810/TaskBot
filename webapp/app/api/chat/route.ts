@@ -140,7 +140,14 @@ Rules:
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) throw new Error('No JSON in response')
 
-    const intent = JSON.parse(jsonMatch[0])
+    // Sanitize JSON: remove control characters inside string values that break JSON.parse
+    const sanitized = jsonMatch[0]
+      .replace(/[\x00-\x1F\x7F]/g, (ch) => {
+        if (ch === '\n' || ch === '\r' || ch === '\t') return ' '
+        return ''
+      })
+
+    const intent = JSON.parse(sanitized)
 
     // Build the list if needed
     let recentList = conversationContext?.recentList || null
