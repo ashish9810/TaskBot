@@ -1744,31 +1744,37 @@ app.action('standup_confirm', async ({ ack, body, client }) => {
     return;
   }
 
-  // Move selected tasks to in_progress
-  let moved = 0;
+  const isEvening = standup.actionType === 'complete';
+  const targetStatus = isEvening ? 'completed' : 'in_progress';
+  const targetLabel = isEvening ? 'Done' : 'In Progress';
+
+  let count = 0;
   for (const taskId of standup.selectedTaskIds) {
+    const updates = { status: targetStatus };
+    if (isEvening) updates.completed_at = new Date().toISOString();
     const { error } = await supabase
       .from('tasks')
-      .update({ status: 'in_progress' })
+      .update(updates)
       .eq('id', taskId);
-    if (!error) moved++;
+    if (!error) count++;
   }
 
   activeStandups.delete(userId);
 
-  const remaining = (standup.todoTasks || []).length - moved;
+  const remaining = (standup.todoTasks || []).length - count;
+  const emoji = isEvening ? ':white_check_mark:' : ':rocket:';
+  const msg = isEvening
+    ? `${emoji} *Marked ${count} task(s) as Done!*\nGreat work today! :star:`
+    : `${emoji} *Moved ${count} task(s) to In Progress.*\nHave a productive day!${remaining > 0 ? `\n\nYou still have ${remaining} task(s) in To Do for later.` : ''}`;
 
   await client.chat.update({
     channel: body.channel?.id || body.container?.channel_id || body.user.id,
     ts: body.message?.ts || body.container?.message_ts,
-    text: `Moved ${moved} task(s) to In Progress.`,
+    text: msg.replace(/[*:]/g, ''),
     blocks: [
       {
         type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `:rocket: *Done! Moved ${moved} task(s) to In Progress.*\nHave a productive day!${remaining > 0 ? `\n\nYou still have ${remaining} task(s) in To Do for later.` : ''}`
-        }
+        text: { type: 'mrkdwn', text: msg }
       }
     ]
   });
