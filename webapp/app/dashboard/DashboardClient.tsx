@@ -78,11 +78,27 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   useEffect(() => {
     if (searchParams.get('slack_connected') === 'true') {
       setShowSlackToast(true)
-      // Remove query param from URL without reload
       window.history.replaceState({}, '', '/dashboard')
       setTimeout(() => setShowSlackToast(false), 5000)
     }
   }, [searchParams])
+
+  // Listen for chatbot task changes and re-fetch tasks
+  useEffect(() => {
+    const handleTasksChanged = async () => {
+      try {
+        const res = await fetch('/api/tasks')
+        if (res.ok) {
+          const freshTasks = await res.json()
+          setTasks(freshTasks as Task[])
+        }
+      } catch (e) {
+        console.error('Failed to refresh tasks:', e)
+      }
+    }
+    window.addEventListener('tasks-changed', handleTasksChanged)
+    return () => window.removeEventListener('tasks-changed', handleTasksChanged)
+  }, [])
 
   const grouped = {
     backlog:     tasks.filter(t => t.status === 'backlog'),
@@ -531,7 +547,7 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const s: Record<string, React.CSSProperties> = {
-  root: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
+  root: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, flex: 1 },
 
   toast: {
     display: 'flex', alignItems: 'center', gap: '10px',
@@ -569,13 +585,12 @@ const s: Record<string, React.CSSProperties> = {
 
   board: {
     display: 'flex',
-    gap: '20px',
+    gap: '16px',
     flex: 1,
+    minHeight: 0,
     overflowX: 'auto',
     overflowY: 'hidden',
     paddingBottom: '12px',
-    marginBottom: '20px',
-    alignItems: 'flex-start',
   },
 
   column: {
@@ -583,15 +598,14 @@ const s: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     width: '340px',
     minWidth: '300px',
+    height: '100%',
     flexShrink: 0,
     background: 'var(--surface)',
-    borderRadius: '16px',
+    borderRadius: '12px',
     borderWidth: '1px',
     borderStyle: 'solid',
     borderColor: 'var(--border)',
-    overflow: 'hidden',
     transition: 'border-color 0.2s, box-shadow 0.2s',
-    maxHeight: 'calc(100vh - 180px)',
   },
   columnOver: { borderColor: 'rgba(124,92,252,0.5)' },
 
@@ -599,7 +613,7 @@ const s: Record<string, React.CSSProperties> = {
 
   colHeader: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '14px 16px 12px',
+    padding: '14px 14px 10px',
     flexShrink: 0,
   },
   colHeaderLeft: { display: 'flex', alignItems: 'center', gap: '8px' },
@@ -622,9 +636,11 @@ const s: Record<string, React.CSSProperties> = {
   },
 
   cardsList: {
-    display: 'flex', flexDirection: 'column', gap: '12px',
-    padding: '8px 12px 16px',
-    overflowY: 'auto', flex: 1,
+    display: 'flex', flexDirection: 'column', gap: '8px',
+    padding: '6px 10px 14px',
+    overflowY: 'auto',
+    flex: 1,
+    minHeight: 0,
   },
 
   emptyCol: {
@@ -643,32 +659,32 @@ const s: Record<string, React.CSSProperties> = {
 // Card styles
 const c: Record<string, React.CSSProperties> = {
   card: {
-    background: 'linear-gradient(180deg, #23243a 0%, #1a1b2e 100%)',
-    borderRadius: '14px',
-    borderTopWidth: '1px', borderRightWidth: '1px', borderBottomWidth: '1px', borderLeftWidth: '3px',
-    borderTopStyle: 'solid', borderRightStyle: 'solid', borderBottomStyle: 'solid', borderLeftStyle: 'solid',
-    borderTopColor: 'rgba(255,255,255,0.12)', borderRightColor: 'rgba(255,255,255,0.06)', borderBottomColor: 'rgba(0,0,0,0.4)', borderLeftColor: 'transparent',
+    background: 'linear-gradient(180deg, #1e1f32 0%, #1a1b2e 100%)',
+    borderRadius: '10px',
+    border: '1px solid var(--border)',
+    borderLeftWidth: '3px',
+    borderLeftStyle: 'solid',
+    borderLeftColor: 'transparent',
     padding: '0',
     cursor: 'grab',
     display: 'flex',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.07) inset',
-    transition: 'transform 0.18s, box-shadow 0.2s',
+    minHeight: '72px',
+    flexShrink: 0,
+    transition: 'background 0.15s, box-shadow 0.15s',
     userSelect: 'none' as const,
     overflow: 'hidden',
   },
-  dragging: { opacity: 0.35, transform: 'scale(0.97) rotate(-1deg)', cursor: 'grabbing' },
+  dragging: { opacity: 0.35, transform: 'scale(0.98)', cursor: 'grabbing' },
   hover: {
-    background: 'linear-gradient(180deg, #2a2b42 0%, #1e1f34 100%)',
-    boxShadow: '0 8px 28px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.12) inset',
-    transform: 'translateY(-3px)',
+    background: 'linear-gradient(180deg, #262740 0%, #1e1f34 100%)',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
   },
   stripe: { width: '3px', flexShrink: 0 },
-  body: { flex: 1, padding: '14px 14px 11px', display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 },
+  body: { flex: 1, padding: '12px 14px 10px', display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 },
 
   title: {
-    fontSize: '14px', fontWeight: 600, color: '#ffffff',
-    lineHeight: 1.5, cursor: 'text', wordBreak: 'break-word' as const,
-    textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+    fontSize: '14px', fontWeight: 500, color: 'var(--text)',
+    lineHeight: 1.45, cursor: 'text', wordBreak: 'break-word' as const,
   },
   titleDone: { textDecoration: 'line-through' },
   titleInput: {
@@ -683,7 +699,7 @@ const c: Record<string, React.CSSProperties> = {
   date: { fontSize: '11px', color: 'var(--muted)', whiteSpace: 'nowrap' as const },
 
   statusPill: {
-    display: 'inline-flex', alignItems: 'center', gap: '5px',
+    display: 'inline-flex', alignItems: 'center', gap: '4px',
     fontSize: '11px', fontWeight: 500,
     border: '1px solid',
     borderRadius: '100px', padding: '2px 8px',

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import Sidebar from '@/components/Sidebar'
+import ChatBot from '@/components/ChatBot'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -65,6 +66,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main style={styles.main}>
         {children}
       </main>
+      <ChatBot />
     </div>
   )
 }
@@ -79,7 +81,7 @@ const styles: Record<string, React.CSSProperties> = {
   main: {
     flex: 1,
     padding: '28px 32px',
-    overflowY: 'auto',
+    overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
