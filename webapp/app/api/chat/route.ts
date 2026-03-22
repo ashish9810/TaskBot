@@ -3,7 +3,8 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+const groqApiKey = process.env.GROQ_API_KEY
+const groq = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null
 
 const STATUS_LABELS: Record<string, string> = {
   backlog: 'Inbox',
@@ -27,6 +28,15 @@ export async function POST(request: NextRequest) {
 
   const { message, conversationContext } = await request.json()
   if (!message?.trim()) return NextResponse.json({ error: 'No message' }, { status: 400 })
+
+  if (!groq) {
+    return NextResponse.json({
+      intent: 'unknown',
+      reply: '⚠️ AI assistant is not configured. GROQ_API_KEY is missing from environment variables.',
+      needsConfirmation: false,
+      executed: false,
+    })
+  }
 
   const admin = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -203,11 +213,12 @@ Rules:
       createTasks: intent.createTasks,
     })
 
-  } catch (err) {
-    console.error('Chat API error:', err)
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    console.error('Chat API error:', errorMsg)
     return NextResponse.json({
       intent: 'unknown',
-      reply: "Sorry, something went wrong. Please try again.",
+      reply: `Sorry, something went wrong: ${errorMsg}`,
       needsConfirmation: false,
       executed: false,
     })
