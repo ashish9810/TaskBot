@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import Sidebar from '@/components/Sidebar'
 import ChatBot from '@/components/ChatBot'
+import RouteProgressBar from '@/components/RouteProgressBar'
 import { autoJoinSlackWorkspace } from '@/lib/sync'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -55,6 +56,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div style={styles.shell}>
+      <RouteProgressBar />
       <Sidebar
         user={{ name: profile?.name || user.email || 'User', email: profile?.email || user.email || '' }}
         workspace={workspace ? { id: workspace.id, name: workspace.name, slackConnected: !!workspace.slack_team_id, slackTeamId: workspace.slack_team_id, slackWorkspaceName } : null}

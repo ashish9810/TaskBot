@@ -34,6 +34,7 @@ const STATUS_DOT: Record<string, string> = {
 export default function TaskCard({ task, readonly = false, onUpdate }: Props) {
   const [localTitle, setLocalTitle] = useState(task.title)
   const [editing, setEditing] = useState(false)
+  const [pulsing, setPulsing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const status = task.status || 'active'
@@ -44,6 +45,8 @@ export default function TaskCard({ task, readonly = false, onUpdate }: Props) {
 
   function handleStatusClick() {
     if (readonly) return
+    setPulsing(true)
+    setTimeout(() => setPulsing(false), 400)
     const next = STATUS_CYCLE[status] || 'active'
     onUpdate?.(task.id, { status: next })
   }
@@ -70,14 +73,14 @@ export default function TaskCard({ task, readonly = false, onUpdate }: Props) {
   }
 
   return (
-    <div style={s.card} onMouseLeave={() => {}}>
+    <div style={{ ...s.card, ...(pulsing ? { animation: 'statusPulse 0.4s ease' } : {}) }} onMouseLeave={() => {}}>
       <button
         onClick={handleStatusClick}
         disabled={readonly}
         style={{ ...s.dotBtn, cursor: readonly ? 'default' : 'pointer' }}
         title={readonly ? undefined : 'Click to advance status'}
       >
-        <div style={{ ...s.dot, background: STATUS_DOT[status] || '#4ade80' }} />
+        <div style={{ ...s.dot, background: STATUS_DOT[status] || '#4ade80', transition: 'background 0.2s, transform 0.15s', ...(pulsing ? { transform: 'scale(1.5)' } : {}) }} />
       </button>
 
       <div style={s.titleWrap} onClick={handleTitleClick}>

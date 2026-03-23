@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 export type Task = {
@@ -72,6 +72,8 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   const [quickAddCol, setQuickAddCol] = useState<string | null>(null)
   const [detailTask, setDetailTask] = useState<Task | null>(null)
   const [showSlackToast, setShowSlackToast] = useState(false)
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+  const [flashField, setFlashField] = useState<string | null>(null)
   const dragTask = useRef<Task | null>(null)
   const searchParams = useSearchParams()
 
@@ -110,8 +112,13 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   const activeCount = tasks.filter(t => t.status === 'backlog' || t.status === 'active' || t.status === 'in_progress').length
 
   async function deleteTask(taskId: string) {
-    setTasks(prev => prev.filter(t => t.id !== taskId))
-    await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
+    // Animate fade-out, then remove after animation completes
+    setDeletingIds(prev => new Set(prev).add(taskId))
+    fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
+    setTimeout(() => {
+      setTasks(prev => prev.filter(t => t.id !== taskId))
+      setDeletingIds(prev => { const next = new Set(prev); next.delete(taskId); return next })
+    }, 350)
   }
 
   async function moveTask(taskId: string, newStatus: string) {
@@ -157,6 +164,9 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   async function updateTaskField(taskId: string, field: string, value: string | null) {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, [field]: value } : t))
     if (detailTask?.id === taskId) setDetailTask(prev => prev ? { ...prev, [field]: value } : prev)
+    // Flash the field in modal to confirm change
+    setFlashField(field)
+    setTimeout(() => setFlashField(null), 500)
     await fetch(`/api/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -281,6 +291,7 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
                       task={task}
                       col={col}
                       isDragging={draggingId === task.id}
+                      isDeleting={deletingIds.has(task.id)}
                       onDragStart={() => onDragStart(task)}
                       onDragEnd={onDragEnd}
                       onUpdateTitle={t => updateTitle(task.id, t)}
@@ -303,9 +314,10 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
       {detailTask && (
         <TaskDetailModal
           task={detailTask}
+          flashField={flashField}
           onClose={() => setDetailTask(null)}
           onUpdateField={(field, value) => updateTaskField(detailTask.id, field, value)}
-          onStatusChange={(status) => { moveTask(detailTask.id, status); setDetailTask(prev => prev ? { ...prev, status } : prev) }}
+          onStatusChange={(status) => { moveTask(detailTask.id, status); setDetailTask(prev => prev ? { ...prev, status } : prev); setFlashField('status'); setTimeout(() => setFlashField(null), 500) }}
           onTitleChange={(title) => { updateTitle(detailTask.id, title); setDetailTask(prev => prev ? { ...prev, title } : prev) }}
         />
       )}
@@ -413,10 +425,11 @@ function PriorityDropdown({ current, onSelect, anchorRef }: { current: string; o
   )
 }
 
-function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTitle, onMove, onDelete, onOpenDetail, onUpdateField, columns }: {
+function KanbanCard({ task, col, isDragging, isDeleting, onDragStart, onDragEnd, onUpdateTitle, onMove, onDelete, onOpenDetail, onUpdateField, columns }: {
   task: Task
   col: typeof COLUMNS[0]
   isDragging: boolean
+  isDeleting?: boolean
   onDragStart: () => void
   onDragEnd: () => void
   onUpdateTitle: (t: string) => void
@@ -454,6 +467,7 @@ function KanbanCard({ task, col, isDragging, onDragStart, onDragEnd, onUpdateTit
         ...(hovered && !isDragging ? c.hover : {}),
         borderLeftColor: col.accent,
         cursor: 'pointer',
+        ...(isDeleting ? { animation: 'fadeOutShrink 0.35s ease forwards', pointerEvents: 'none' as const } : {}),
       }}
     >
       {/* Left accent stripe */}
@@ -800,8 +814,9 @@ const qa: Record<string, React.CSSProperties> = {
 const PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'] as const
 const STATUS_OPTIONS = COLUMNS.map(c => ({ id: c.id, label: c.label, color: c.accent }))
 
-function TaskDetailModal({ task, onClose, onUpdateField, onStatusChange, onTitleChange }: {
+function TaskDetailModal({ task, flashField, onClose, onUpdateField, onStatusChange, onTitleChange }: {
   task: Task
+  flashField?: string | null
   onClose: () => void
   onUpdateField: (field: string, value: string | null) => void
   onStatusChange: (status: string) => void
@@ -884,7 +899,7 @@ function TaskDetailModal({ task, onClose, onUpdateField, onStatusChange, onTitle
 
         {/* Meta row: Status, Priority, Due Date */}
         <div style={m.metaGrid}>
-          <div style={m.metaItem}>
+          <div style={{ ...m.metaItem, borderRadius: '8px', ...(flashField === 'status' ? { animation: 'confirmFlash 0.5s ease' } : {}) }}>
             <span style={m.metaLabel}>Status</span>
             <div style={m.metaOptions}>
               {STATUS_OPTIONS.map(s => (
@@ -903,7 +918,7 @@ function TaskDetailModal({ task, onClose, onUpdateField, onStatusChange, onTitle
             </div>
           </div>
 
-          <div style={m.metaItem}>
+          <div style={{ ...m.metaItem, borderRadius: '8px', ...(flashField === 'priority' ? { animation: 'confirmFlash 0.5s ease' } : {}) }}>
             <span style={m.metaLabel}>Priority</span>
             <div style={m.metaOptions}>
               {PRIORITIES.map(p => (
@@ -925,7 +940,7 @@ function TaskDetailModal({ task, onClose, onUpdateField, onStatusChange, onTitle
             </div>
           </div>
 
-          <div style={m.metaItem}>
+          <div style={{ ...m.metaItem, borderRadius: '8px', ...(flashField === 'due_date' ? { animation: 'confirmFlash 0.5s ease' } : {}) }}>
             <span style={m.metaLabel}>Due Date</span>
             <input
               type="date"

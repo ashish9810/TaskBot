@@ -4,6 +4,7 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
+import RouteProgressBar from '@/components/RouteProgressBar'
 
 type Screen = 'form' | 'check-email'
 
@@ -271,5 +272,5 @@ const s: Record<string, React.CSSProperties> = {
 }
 
 export default function SignupPage() {
-  return <Suspense><SignupForm /></Suspense>
+  return <><RouteProgressBar /><Suspense><SignupForm /></Suspense></>
 }

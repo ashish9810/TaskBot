@@ -4,6 +4,7 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
+import RouteProgressBar from '@/components/RouteProgressBar'
 
 function LoginForm() {
   const router = useRouter()
@@ -247,7 +248,7 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-  return <Suspense><LoginForm /></Suspense>
+  return <><RouteProgressBar /><Suspense><LoginForm /></Suspense></>
 }
 
 const s: Record<string, React.CSSProperties> = {

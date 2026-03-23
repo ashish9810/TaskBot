@@ -47,6 +47,22 @@ body {
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+@keyframes confirmFlash {
+  0% { background-color: rgba(124, 92, 252, 0.15); }
+  100% { background-color: transparent; }
+}
+
+@keyframes fadeOutShrink {
+  0% { opacity: 1; max-height: 120px; margin-bottom: 8px; }
+  100% { opacity: 0; max-height: 0; margin-bottom: 0; padding: 0; border-width: 0; overflow: hidden; }
+}
+
+@keyframes statusPulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
