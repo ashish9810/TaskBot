@@ -52,11 +52,11 @@ function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() }),
       })
-      const { exists } = await checkRes.json()
+      const { exists, slackUserFound } = await checkRes.json()
 
       if (!exists) {
         setLoading(false)
-        setErrors({ general: 'no-account' })
+        setErrors({ general: slackUserFound ? 'slack-user-no-account' : 'no-account' })
         return
       }
 
@@ -184,7 +184,7 @@ function LoginForm() {
             {errors.password && <p style={s.fieldErr}>{errors.password}</p>}
           </div>
 
-          {errors.general && errors.general !== 'no-account' && errors.general !== 'unconfirmed' && (
+          {errors.general && errors.general !== 'no-account' && errors.general !== 'unconfirmed' && errors.general !== 'slack-user-no-account' && (
             <div style={s.errBox}>
               <span>⚠️</span>
               <span>{errors.general}</span>
@@ -204,6 +204,17 @@ function LoginForm() {
                   {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend confirmation email'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {errors.general === 'slack-user-no-account' && (
+            <div style={s.slackFoundBox}>
+              <p style={s.slackFoundText}>
+                We found <strong style={{ color: 'var(--text)' }}>{email}</strong> in a Slack workspace! Sign up with this email to access your tasks on the web.
+              </p>
+              <Link href={`/signup?email=${encodeURIComponent(email)}`} style={s.signupCta}>
+                Create your account →
+              </Link>
             </div>
           )}
 
@@ -263,6 +274,8 @@ const s: Record<string, React.CSSProperties> = {
   spinner: { display: 'inline-block', width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 },
   switchText: { marginTop: '24px', textAlign: 'center', fontSize: '14px', color: 'var(--muted)' },
   link: { color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 },
+  slackFoundBox: { background: 'rgba(124,92,252,0.08)', border: '1px solid rgba(124,92,252,0.25)', borderRadius: '8px', padding: '14px 16px', display: 'flex', flexDirection: 'column' as const, gap: '10px' },
+  slackFoundText: { fontSize: '13px', color: 'rgba(240,240,248,0.85)', lineHeight: 1.5 },
   noAccountBox: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px 16px', display: 'flex', flexDirection: 'column' as const, gap: '10px' },
   noAccountText: { fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5 },
   signupCta: { fontSize: '14px', fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' },

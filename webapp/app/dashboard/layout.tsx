@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import Sidebar from '@/components/Sidebar'
 import ChatBot from '@/components/ChatBot'
+import { autoJoinSlackWorkspace } from '@/lib/sync'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -23,20 +24,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!membership) redirect('/onboarding')
 
-  // Ensure Slack identity is linked (runs every dashboard load, upsert is idempotent)
+  // Ensure Slack identity is linked + auto-join workspace if needed (idempotent)
   if (profile?.email) {
-    const { data: slackUsers } = await admin
-      .from('users')
-      .select('slack_user_id, team_id')
-      .ilike('email', profile.email)
-    if (slackUsers && slackUsers.length > 0) {
-      await admin
-        .from('profile_slack_links')
-        .upsert(
-          slackUsers.map(u => ({ profile_id: user.id, slack_user_id: u.slack_user_id, team_id: u.team_id })),
-          { onConflict: 'slack_user_id,team_id' }
-        )
-    }
+    await autoJoinSlackWorkspace(admin, user.id, profile.email)
   }
 
   const { data: workspace } = await admin
