@@ -6,7 +6,8 @@ import type { NextRequest } from 'next/server'
 import { autoJoinSlackWorkspace } from '@/lib/sync'
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+  const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
   const code = searchParams.get('code')
   const type = searchParams.get('type') // 'recovery' for password reset links
   const next = searchParams.get('next') ?? '/dashboard'
