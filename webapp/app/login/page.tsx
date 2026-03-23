@@ -104,8 +104,9 @@ function LoginForm() {
     const supabase = createClient()
 
     try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
       await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+        redirectTo: `${appUrl}/auth/callback?type=recovery`,
       })
       router.push(`/login?message=If an account exists with ${email}, we've sent a password reset link. Check your inbox (and spam folder).`)
     } catch {

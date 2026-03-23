@@ -42,12 +42,13 @@ function SignupForm() {
     const supabase = createClient()
     let data, error
     try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
       const result = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { name },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${appUrl}/auth/callback`,
         },
       })
       data = result.data
