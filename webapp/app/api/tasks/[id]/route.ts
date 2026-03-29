@@ -69,7 +69,7 @@ export async function PATCH(
     .single()
 
   if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })
   }
 
   return NextResponse.json(updated)
@@ -115,7 +115,7 @@ export async function DELETE(
   await admin.from('updates').delete().eq('task_id', id)
   const { error } = await admin.from('tasks').delete().eq('id', id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 })
 
   return NextResponse.json({ deleted: true })
 }

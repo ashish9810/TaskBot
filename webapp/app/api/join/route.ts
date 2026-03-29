@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     .insert({ workspace_id: invite.workspace_id, profile_id: user.id, role: 'member' })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to join workspace' }, { status: 500 })
   }
 
   return NextResponse.json({ success: true, workspace_name: (invite.workspaces as unknown as { name: string })?.name })

@@ -17,13 +17,24 @@ export async function GET(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const db = admin()
+
+  // Verify task exists and user has access
+  const { data: task } = await db.from('tasks').select('id, user_id').eq('id', id).single()
+  if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+
+  const { data: slackLinks } = await db.from('profile_slack_links').select('slack_user_id').eq('profile_id', user!.id)
+  const slackIds = slackLinks?.map(l => l.slack_user_id) || []
+  if (task.user_id !== user!.id && !slackIds.includes(task.user_id)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const { data: updates, error } = await db
     .from('updates')
     .select('*')
     .eq('task_id', id)
     .order('created_at', { ascending: true })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Failed to fetch updates' }, { status: 500 })
 
   // Resolve user names for updates
   const userIds = [...new Set((updates || []).map(u => u.user_id))]
@@ -69,14 +80,21 @@ export async function POST(
 
   const db = admin()
 
-  // Get task to find team_id and resolve user's slack identity
+  // Get task to find team_id and verify ownership
   const { data: task } = await db
     .from('tasks')
-    .select('team_id')
+    .select('team_id, user_id')
     .eq('id', id)
     .single()
 
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+
+  // Verify caller owns this task
+  const { data: ownerLinks } = await db.from('profile_slack_links').select('slack_user_id').eq('profile_id', user.id)
+  const ownerSlackIds = ownerLinks?.map(l => l.slack_user_id) || []
+  if (task.user_id !== user.id && !ownerSlackIds.includes(task.user_id)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   // Resolve user's slack identity for the update
   let updateUserId = user.id
@@ -100,7 +118,7 @@ export async function POST(
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Failed to create update' }, { status: 500 })
 
   return NextResponse.json(update)
 }

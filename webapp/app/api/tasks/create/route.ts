@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Failed to create task' }, { status: 500 })
 
   return NextResponse.json(task)
 }

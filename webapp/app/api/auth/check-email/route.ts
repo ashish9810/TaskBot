@@ -18,5 +18,8 @@ export async function POST(request: NextRequest) {
     admin.from('users').select('slack_user_id').ilike('email', normalizedEmail).limit(1).maybeSingle(),
   ])
 
+  // Introduce a small constant-time delay to prevent timing-based enumeration
+  await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 50))
+
   return NextResponse.json({ exists: !!profile, slackUserFound: !!slackUser })
 }

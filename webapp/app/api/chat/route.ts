@@ -184,9 +184,13 @@ Rules:
     }
 
     // Execute confirmed actions (move/delete) when taskIds are provided
+    // Only operate on tasks the user owns (taskIds come from AI context which is already filtered to user's tasks)
+    const userTaskIds = new Set(tasks.map(t => t.id))
+
     if (intent.intent === 'move' && intent.taskIds && intent.taskIds.length > 0 && !intent.needsConfirmation) {
       let moved = 0
       for (const taskId of intent.taskIds) {
+        if (!userTaskIds.has(taskId)) continue // skip tasks not owned by user
         const updates: Record<string, unknown> = { status: intent.targetStatus }
         if (intent.targetStatus === 'completed') updates.completed_at = new Date().toISOString()
         else updates.completed_at = null
@@ -200,6 +204,7 @@ Rules:
     if (intent.intent === 'delete' && intent.taskIds && intent.taskIds.length > 0 && !intent.needsConfirmation) {
       let deleted = 0
       for (const taskId of intent.taskIds) {
+        if (!userTaskIds.has(taskId)) continue // skip tasks not owned by user
         await admin.from('updates').delete().eq('task_id', taskId)
         const { error } = await admin.from('tasks').delete().eq('id', taskId)
         if (!error) deleted++
@@ -225,7 +230,7 @@ Rules:
     console.error('Chat API error:', errorMsg)
     return NextResponse.json({
       intent: 'unknown',
-      reply: `Sorry, something went wrong: ${errorMsg}`,
+      reply: 'Sorry, something went wrong. Please try again.',
       needsConfirmation: false,
       executed: false,
     })
@@ -245,7 +250,27 @@ export async function PUT(request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
+  // Verify ownership of all referenced tasks
+  if (taskIds && Array.isArray(taskIds) && taskIds.length > 0) {
+    const { data: slackLinks } = await admin.from('profile_slack_links').select('slack_user_id').eq('profile_id', user.id)
+    const allowedUserIds = [user.id, ...(slackLinks?.map(l => l.slack_user_id) || [])]
+
+    const { data: ownedTasks } = await admin
+      .from('tasks')
+      .select('id, user_id')
+      .in('id', taskIds)
+
+    const unauthorizedIds = (ownedTasks || []).filter(t => !allowedUserIds.includes(t.user_id)).map(t => t.id)
+    if (unauthorizedIds.length > 0) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  }
+
   if (action === 'move' && taskIds && targetStatus) {
+    const allowed = ['backlog', 'active', 'in_progress', 'completed']
+    if (!allowed.includes(targetStatus)) {
+      return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+    }
     let moved = 0
     for (const taskId of taskIds) {
       const updates: Record<string, unknown> = { status: targetStatus }

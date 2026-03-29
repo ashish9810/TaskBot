@@ -32,7 +32,6 @@ function initBot() {
     clientSecret: process.env.SLACK_CLIENT_SECRET,
     stateSecret: process.env.SLACK_STATE_SECRET,
     installerOptions: {
-      stateVerification: false,
       callbackOptions: {
         success: (installation, _options, _req, res) => {
           const teamId = installation.team?.id || installation.enterprise?.id || '';
@@ -129,14 +128,20 @@ function initBot() {
   // Express routes
   receiver.router.get('/health', (_req, res) => res.status(200).send('OK'));
 
+  // Helper to check admin secret from Authorization header
+  const checkAdminSecret = (req) => {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    return token === process.env.SYNC_SECRET;
+  };
+
   receiver.router.get('/sync-users', async (req, res) => {
-    const secret = req.query.secret;
-    if (secret !== process.env.SYNC_SECRET) {
+    if (!checkAdminSecret(req)) {
       return res.status(401).send('Unauthorized');
     }
 
     const { data: installations, error } = await supabase.from('installations').select('team_id, bot_token, team_name');
-    if (error) return res.status(500).send('Failed to fetch installations: ' + error.message);
+    if (error) return res.status(500).send('Internal server error');
 
     res.json({ message: `Syncing ${installations.length} workspace(s) in background...`, workspaces: installations.map(i => i.team_name) });
 
@@ -149,10 +154,10 @@ function initBot() {
   });
 
   receiver.router.get('/test-standup', async (req, res) => {
-    const { user, team, secret } = req.query;
-    if (secret !== process.env.SLACK_STATE_SECRET) {
+    if (!checkAdminSecret(req)) {
       return res.status(401).send('Unauthorized');
     }
+    const { user, team } = req.query;
     if (!user || !team) {
       return res.status(400).send('Missing user or team query params');
     }
@@ -164,16 +169,16 @@ function initBot() {
         .eq('team_id', team)
         .single();
 
-      if (!install) return res.status(404).send('No installation found for this team');
+      if (!install) return res.status(404).send('Not found');
 
       const { WebClient } = require('@slack/web-api');
       const client = new WebClient(install.bot_token);
 
       await triggerStandupForUser(client, user, team, supabase);
-      res.send(`Standup nudge sent to user ${user}`);
+      res.send('Standup nudge sent');
     } catch (err) {
       console.error('[test-standup] Error:', err.message);
-      res.status(500).send('Error: ' + err.message);
+      res.status(500).send('Internal server error');
     }
   });
 

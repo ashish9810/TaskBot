@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
   if (wsError || !workspace) {
     console.error('Workspace insert error:', wsError)
-    return NextResponse.json({ error: wsError?.message || 'Failed to create workspace' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to create workspace' }, { status: 500 })
   }
 
   // Add user as owner
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     console.error('Member insert error:', memberError)
     // Rollback workspace
     await admin.from('workspaces').delete().eq('id', workspace.id)
-    return NextResponse.json({ error: memberError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to create workspace' }, { status: 500 })
   }
 
   return NextResponse.json(workspace)
