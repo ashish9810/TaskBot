@@ -1,4 +1,4 @@
-const { parseTasks } = require('./parse-tasks');
+const { parseTasks, extractTasksFromThread, formatThreadForLLM } = require('./parse-tasks');
 const { activeStandups, handleStandupReply } = require('./standup');
 const { understandIntent, buildTaskListMessage, buildSummaryMessage, STATUS_LABELS, UNKNOWN_RESPONSE } = require('./conversation');
 
@@ -705,9 +705,224 @@ function registerHandlers(app, supabase, maps) {
       await client.chat.postMessage({
         channel: event.channel,
         thread_ts: event.ts,
-        text: `Hi <@${event.user}>! Here's how to use Ping:\n• *@Ping assign @John fix the login bug, send report, review Q1* — assign tasks to others or yourself\n• *@Ping create PRD for payments, send report to manager* — create tasks for yourself`
+        text: `Hi <@${event.user}>! Here's how to use Ping:\n• *@Ping assign @John fix the login bug, send report, review Q1* — assign tasks to others or yourself\n• *@Ping create PRD for payments, send report to manager* — create tasks for yourself\n• Tag *@Ping* in any thread to extract tasks from the conversation`
       });
       return;
+    }
+
+    // ── THREAD TASK EXTRACTION ──
+    // Detect if the mention is inside a thread and asking for task extraction
+    const THREAD_TASK_PATTERNS = [
+      /\b(assign|create|extract|find|identify|list|get|pull)\b.*\b(task|tasks|action items?|todos?|to-dos?)\b/i,
+      /\b(task|tasks|action items?|todos?|to-dos?)\b.*\b(from this|from the|in this)\b.*\b(thread|conversation|chat|discussion)\b/i,
+      /\bwhat.*\b(task|tasks|action items?|todos?)\b/i,
+    ];
+    const isThreaded = !!event.thread_ts;
+    const isThreadTaskRequest = isThreaded && THREAD_TASK_PATTERNS.some(p => p.test(text));
+
+    if (isThreadTaskRequest) {
+      try {
+        await client.reactions.add({
+          channel: event.channel,
+          timestamp: event.ts,
+          name: 'hourglass_flowing_sand'
+        }).catch(() => {});
+
+        // Fetch thread messages
+        let threadMessages = [];
+        let cursor;
+        do {
+          const result = await client.conversations.replies({
+            channel: event.channel,
+            ts: event.thread_ts,
+            limit: 100,
+            inclusive: true,
+            ...(cursor ? { cursor } : {}),
+          });
+          threadMessages = threadMessages.concat(result.messages || []);
+          cursor = result.response_metadata?.next_cursor;
+        } while (cursor && threadMessages.length < 100);
+
+        // Need at least 2 messages (parent + at least one reply besides the bot mention)
+        const humanMsgs = threadMessages.filter(m => !m.bot_id && m.user !== botUserId);
+        if (humanMsgs.length < 2) {
+          await client.chat.postMessage({
+            channel: event.channel,
+            thread_ts: event.thread_ts,
+            text: "This thread doesn't seem to have enough conversation to extract tasks from. I need at least a couple of messages to work with."
+          });
+          await client.reactions.remove({ channel: event.channel, timestamp: event.ts, name: 'hourglass_flowing_sand' }).catch(() => {});
+          return;
+        }
+
+        // Collect unique user IDs from the thread
+        const uniqueUserIds = [...new Set(threadMessages.map(m => m.user).filter(Boolean))];
+
+        // Resolve user names from Supabase + Slack API fallback
+        const { data: knownUsers } = await supabase
+          .from('users')
+          .select('slack_user_id, name')
+          .eq('team_id', teamId)
+          .in('slack_user_id', uniqueUserIds);
+
+        const userMap = new Map();
+        for (const u of (knownUsers || [])) {
+          userMap.set(u.slack_user_id, u.name);
+        }
+        // Fallback: fetch names from Slack for any users not in DB
+        for (const uid of uniqueUserIds) {
+          if (!userMap.has(uid) && uid !== botUserId) {
+            try {
+              const info = await client.users.info({ user: uid });
+              const name = info.user?.real_name || info.user?.profile?.display_name || uid;
+              userMap.set(uid, name);
+            } catch { /* skip */ }
+          }
+        }
+
+        // Build participant list for the LLM prompt
+        const participantList = [...userMap.entries()]
+          .filter(([id]) => id !== botUserId)
+          .map(([id, name]) => `${id} = "${name}"`)
+          .join('\n');
+
+        const requesterName = userMap.get(event.user) || 'Unknown';
+
+        // Format thread and call LLM
+        const formattedThread = formatThreadForLLM(threadMessages, userMap, botUserId);
+
+        let result;
+        try {
+          result = await extractTasksFromThread(
+            formattedThread,
+            participantList,
+            { slackId: event.user, name: requesterName },
+            text
+          );
+        } catch (err) {
+          if (err.status === 429) {
+            await client.chat.postMessage({
+              channel: event.channel,
+              thread_ts: event.thread_ts,
+              text: "I'm a bit busy right now — please try again in about 30 seconds. :hourglass:"
+            });
+            await client.reactions.remove({ channel: event.channel, timestamp: event.ts, name: 'hourglass_flowing_sand' }).catch(() => {});
+            return;
+          }
+          throw err;
+        }
+
+        const tasks = result.tasks || [];
+
+        if (tasks.length === 0) {
+          await client.chat.postMessage({
+            channel: event.channel,
+            thread_ts: event.thread_ts,
+            text: "I read through the thread but couldn't identify any clear action items. Try being more specific, e.g.:\n*@Ping create a task for Bob to fix the API bug discussed here*"
+          });
+          await client.reactions.remove({ channel: event.channel, timestamp: event.ts, name: 'hourglass_flowing_sand' }).catch(() => {});
+          return;
+        }
+
+        // Store in pendingBulkCreations (reuse existing confirm/cancel flow)
+        const formattedTasks = tasks.map(t => ({
+          title: t.title,
+          assignee_slack_id: t.assignee_slack_id || null,
+          assignee_hint: t.assignee_name || null,
+        }));
+
+        pendingBulkCreations.set(event.user, {
+          tasks: formattedTasks,
+          teamId,
+          channelId: event.channel,
+          threadTs: event.thread_ts,
+          mentionedUsers: [...userMap.entries()]
+            .filter(([id]) => id !== botUserId)
+            .map(([slack_user_id, name]) => ({ slack_user_id, name })),
+          timestamp: Date.now(),
+        });
+
+        // Build checkbox options
+        const checkboxOptions = formattedTasks.map((task, i) => {
+          let label = task.title.substring(0, 55);
+          const assigneeId = task.assignee_slack_id;
+          if (assigneeId) {
+            const assigneeName = userMap.get(assigneeId)?.split(' ')[0] || 'someone';
+            label += ` → ${assigneeName}`;
+          } else {
+            label += ' → unassigned';
+          }
+          return {
+            text: { type: 'plain_text', text: label.substring(0, 75) },
+            value: String(i),
+          };
+        });
+
+        const blocks = [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `:mag: *Thread summary:* ${result.summary}`,
+            },
+          },
+          { type: 'divider' },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `:clipboard: <@${event.user}>, I found *${tasks.length} task(s)* in this thread:`,
+            },
+          },
+          {
+            type: 'actions',
+            block_id: 'bulk_task_checkboxes',
+            elements: [{
+              type: 'checkboxes',
+              action_id: 'bulk_task_selection',
+              initial_options: checkboxOptions,
+              options: checkboxOptions,
+            }],
+          },
+          {
+            type: 'actions',
+            elements: [
+              {
+                type: 'button',
+                text: { type: 'plain_text', text: ':white_check_mark: Create Selected' },
+                style: 'primary',
+                action_id: 'bulk_create_confirm',
+                value: event.user,
+              },
+              {
+                type: 'button',
+                text: { type: 'plain_text', text: ':x: Cancel' },
+                action_id: 'bulk_create_cancel',
+                value: event.user,
+              },
+            ],
+          },
+        ];
+
+        await client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: event.thread_ts,
+          text: `I found ${tasks.length} task(s) from this thread:`,
+          blocks,
+        });
+
+        await client.reactions.remove({ channel: event.channel, timestamp: event.ts, name: 'hourglass_flowing_sand' }).catch(() => {});
+        return;
+      } catch (err) {
+        console.error('[thread_tasks] Error:', err.message);
+        await client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: event.thread_ts || event.ts,
+          text: "Sorry, something went wrong while reading this thread. Please try again."
+        });
+        await client.reactions.remove({ channel: event.channel, timestamp: event.ts, name: 'hourglass_flowing_sand' }).catch(() => {});
+        return;
+      }
     }
 
     try {

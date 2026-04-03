@@ -117,4 +117,125 @@ Rules:
   return indices;
 }
 
-module.exports = { parseTasks, matchTasksFromReply };
+/**
+ * Format thread messages into a compact string for LLM consumption.
+ * Filters bot messages, resolves user mentions, collapses consecutive same-user messages.
+ *
+ * @param {Array<{user: string, text: string, bot_id?: string}>} messages - Slack thread messages
+ * @param {Map<string, string>} userMap - Slack user ID → display name
+ * @param {string} botUserId - The bot's own Slack user ID (to filter out)
+ * @returns {string} Formatted thread text
+ */
+function formatThreadForLLM(messages, userMap, botUserId) {
+  // Filter out bot messages and the bot's own messages
+  const humanMessages = messages.filter(m =>
+    !m.bot_id && m.user !== botUserId && m.subtype !== 'bot_message'
+  );
+
+  // Cap at 50 most recent messages (always keep parent = first message)
+  let capped = humanMessages;
+  if (humanMessages.length > 50) {
+    capped = [humanMessages[0], ...humanMessages.slice(-49)];
+  }
+
+  // Resolve <@U123> mentions in text
+  const resolveMentions = (text) =>
+    (text || '').replace(/<@([A-Z0-9]+)>/g, (_, id) => {
+      const name = userMap.get(id);
+      return name ? `@${name}` : `@unknown`;
+    });
+
+  // Build compact format, collapsing consecutive same-user messages
+  const lines = [];
+  let lastUser = null;
+  for (const msg of capped) {
+    const name = userMap.get(msg.user) || 'Unknown';
+    let text = resolveMentions(msg.text || '');
+    // Truncate very long messages
+    if (text.length > 500) text = text.substring(0, 500) + ' [truncated]';
+
+    if (msg.user === lastUser) {
+      lines.push(text);
+    } else {
+      lines.push(`[${name}] ${text}`);
+      lastUser = msg.user;
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Extract tasks + assignees from a Slack thread conversation using Groq LLM.
+ *
+ * @param {string} formattedThread - Compact thread text from formatThreadForLLM
+ * @param {string} participantList - "U123 = Alice, U456 = Bob" mapping
+ * @param {{ slackId: string, name: string }} requester - Who tagged the bot
+ * @param {string} userMessage - The user's specific request (e.g. "assign tasks from this thread")
+ * @returns {Promise<{ tasks: Array<{ title: string, assignee_slack_id: string|null, assignee_name: string|null }>, summary: string }>}
+ */
+async function extractTasksFromThread(formattedThread, participantList, requester, userMessage) {
+  const prompt = `You are a task extraction assistant. A team conversation in Slack is provided below.
+Your job is to identify actionable tasks discussed in this conversation and determine who each task should be assigned to.
+
+Thread participants (Slack ID = Name):
+${participantList}
+
+The user who asked you to extract tasks: ${requester.name} (${requester.slackId})
+
+Conversation:
+${formattedThread}
+
+The user's request: "${userMessage}"
+
+Return ONLY valid JSON (no markdown, no explanation):
+{
+  "tasks": [
+    {
+      "title": "concise task description starting with a verb",
+      "assignee_slack_id": "SLACK_USER_ID or null",
+      "assignee_name": "display name or null"
+    }
+  ],
+  "summary": "1-2 sentence summary of the conversation"
+}
+
+Rules:
+- Extract ONLY clearly actionable items (commitments, requests, decisions)
+- Do NOT extract vague discussion points or questions
+- "title": clean, actionable task. Start with a verb (e.g. "Fix", "Write", "Review", "Update")
+- "assignee_slack_id": use the exact Slack user ID from the participant list above.
+  * If someone says "I'll do X" or "I can handle X", assign to that speaker's Slack ID.
+  * If someone says "@Bob can you do X" or "Bob handle X", assign to Bob's Slack ID.
+  * If the requester says "assign me" or "assign tasks to me", assign to the requester (${requester.slackId}).
+  * If the assignee is unclear, set to null.
+- "assignee_name": the display name of the assignee (for readability), or null.
+- Keep task count reasonable (1-8 tasks). Don't over-extract.
+- If no clear tasks are found, return an empty tasks array.`;
+
+  const chatCompletion = await groq.chat.completions.create({
+    messages: [{ role: 'user', content: prompt }],
+    model: 'llama-3.3-70b-versatile',
+    temperature: 0.1,
+    max_tokens: 1024,
+  });
+
+  const text = chatCompletion.choices[0]?.message?.content || '';
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('No JSON in thread extraction response');
+
+  const sanitized = jsonMatch[0].replace(/[\x00-\x1F\x7F]/g, (ch) => {
+    if (ch === '\n' || ch === '\r' || ch === '\t') return ' ';
+    return '';
+  });
+  const parsed = JSON.parse(sanitized);
+  if (!parsed.tasks || !Array.isArray(parsed.tasks)) throw new Error('Invalid response shape');
+
+  return {
+    tasks: parsed.tasks,
+    summary: parsed.summary || 'Thread analyzed.',
+  };
+}
+
+module.exports = { parseTasks, matchTasksFromReply, extractTasksFromThread, formatThreadForLLM };

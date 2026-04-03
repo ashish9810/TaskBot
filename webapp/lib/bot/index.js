@@ -44,8 +44,11 @@ function initBot() {
     },
     scopes: [
       'app_mentions:read',
+      'channels:history',
       'channels:read',
       'chat:write',
+      'groups:history',
+      'groups:read',
       'im:history',
       'im:read',
       'im:write',
