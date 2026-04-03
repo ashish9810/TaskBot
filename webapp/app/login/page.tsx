@@ -243,6 +243,13 @@ function LoginForm() {
           <Link href="/signup" style={s.link}>Create one free</Link>
         </p>
       </div>
+
+      {loading && (
+        <div style={s.overlay}>
+          <div style={s.overlaySpinner} />
+          <p style={s.overlayText}>Signing you in…</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -283,4 +290,7 @@ const s: Record<string, React.CSSProperties> = {
   signupCta: { fontSize: '14px', fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' },
   resendBtn: { background: 'rgba(124,92,252,0.15)', border: '1px solid rgba(124,92,252,0.3)', borderRadius: '6px', padding: '8px 12px', fontSize: '12px', color: 'rgba(240,240,248,0.85)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' as const, transition: 'opacity 0.2s' },
   resendBtnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(10, 10, 18, 0.75)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', gap: '16px', zIndex: 50 },
+  overlaySpinner: { width: '32px', height: '32px', border: '3px solid rgba(124, 92, 252, 0.25)', borderTopColor: '#7c5cfc', borderRadius: '50%', animation: 'spin 0.7s linear infinite' },
+  overlayText: { fontSize: '15px', fontWeight: 500, color: 'rgba(238, 238, 248, 0.85)', letterSpacing: '-0.01em' },
 }

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { createClient } from '@/lib/supabase-browser'
 
 export type Task = {
   id: string
@@ -100,6 +101,29 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
     }
     window.addEventListener('tasks-changed', handleTasksChanged)
     return () => window.removeEventListener('tasks-changed', handleTasksChanged)
+  }, [])
+
+  // Supabase Realtime: auto-refresh when tasks change in DB (e.g. from Slack bot)
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('tasks-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        window.dispatchEvent(new Event('tasks-changed'))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
+  // Refresh tasks when tab becomes visible (safety net for dropped WebSocket)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        window.dispatchEvent(new Event('tasks-changed'))
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
   const grouped = {
