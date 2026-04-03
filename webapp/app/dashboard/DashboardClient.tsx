@@ -79,6 +79,7 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   const [flashField, setFlashField] = useState<string | null>(null)
   const dragTask = useRef<Task | null>(null)
   const dragOverHalf = useRef<'top' | 'bottom'>('bottom')
+  const reorderCooldown = useRef(false)
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -107,12 +108,15 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   }, [])
 
   // Supabase Realtime: auto-refresh when tasks change in DB (e.g. from Slack bot)
+  // Skip during reorder cooldown to avoid overwriting optimistic state
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
       .channel('tasks-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
-        window.dispatchEvent(new Event('tasks-changed'))
+        if (!reorderCooldown.current) {
+          window.dispatchEvent(new Event('tasks-changed'))
+        }
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -227,31 +231,29 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
     if (!dragged) { onDragEnd(); return }
 
     const sameColumn = dragged.status === colId
-    if (sameColumn && dragOverTaskId) {
+    if (sameColumn && dragOverTaskId && dragOverTaskId !== dragged.id) {
       // Reorder within column
       const colTasks = [...(grouped[colId] || [])]
       const fromIndex = colTasks.findIndex(t => t.id === dragged.id)
-      let toIndex = colTasks.findIndex(t => t.id === dragOverTaskId)
-      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) { onDragEnd(); return }
+      const overIndex = colTasks.findIndex(t => t.id === dragOverTaskId)
+      if (fromIndex === -1 || overIndex === -1) { onDragEnd(); return }
 
-      // Adjust target based on drop position (above/below)
-      if (dragOverHalf.current === 'bottom' && toIndex > fromIndex) {
-        // Already moving down, toIndex is correct
-      } else if (dragOverHalf.current === 'top' && toIndex < fromIndex) {
-        // Already moving up, toIndex is correct
-      } else if (dragOverHalf.current === 'bottom') {
-        toIndex += 1
-      }
-
-      // Remove and reinsert
+      // Remove the dragged item first
       const [moved] = colTasks.splice(fromIndex, 1)
-      const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex
+
+      // Calculate insert position: if dropping on bottom half, insert after target
+      const targetIndex = colTasks.findIndex(t => t.id === dragOverTaskId)
+      const insertAt = dragOverHalf.current === 'bottom' ? targetIndex + 1 : targetIndex
       colTasks.splice(insertAt, 0, moved)
 
       // Update positions in local state
       const updatedIds = colTasks.map(t => t.id)
       const positionMap = Object.fromEntries(updatedIds.map((id, i) => [id, i]))
       setTasks(prev => prev.map(t => positionMap[t.id] !== undefined ? { ...t, position: positionMap[t.id] } : t))
+
+      // Suppress realtime refreshes while backend catches up
+      reorderCooldown.current = true
+      setTimeout(() => { reorderCooldown.current = false }, 2000)
 
       // Persist to backend
       fetch('/api/tasks/reorder', {
