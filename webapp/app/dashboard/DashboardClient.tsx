@@ -14,6 +14,7 @@ export type Task = {
   priority?: string | null
   due_date?: string | null
   assigned_by?: string | null
+  position?: number | null
 }
 
 type TaskUpdate = {
@@ -70,12 +71,14 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   const [tasks, setTasks] = useState<Task[]>(initialTasks as unknown as Task[])
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null)
   const [quickAddCol, setQuickAddCol] = useState<string | null>(null)
   const [detailTask, setDetailTask] = useState<Task | null>(null)
   const [showSlackToast, setShowSlackToast] = useState(false)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [flashField, setFlashField] = useState<string | null>(null)
   const dragTask = useRef<Task | null>(null)
+  const dragOverHalf = useRef<'top' | 'bottom'>('bottom')
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -206,15 +209,64 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   function onDragEnd() {
     setDraggingId(null)
     setDragOver(null)
+    setDragOverTaskId(null)
     dragTask.current = null
   }
 
+  function onCardDragOver(e: React.DragEvent, taskId: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const midY = rect.top + rect.height / 2
+    dragOverHalf.current = e.clientY < midY ? 'top' : 'bottom'
+    setDragOverTaskId(taskId)
+  }
+
   function onDrop(colId: string) {
-    if (dragTask.current && dragTask.current.status !== colId) {
-      moveTask(dragTask.current.id, colId)
+    const dragged = dragTask.current
+    if (!dragged) { onDragEnd(); return }
+
+    const sameColumn = dragged.status === colId
+    if (sameColumn && dragOverTaskId) {
+      // Reorder within column
+      const colTasks = [...(grouped[colId] || [])]
+      const fromIndex = colTasks.findIndex(t => t.id === dragged.id)
+      let toIndex = colTasks.findIndex(t => t.id === dragOverTaskId)
+      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) { onDragEnd(); return }
+
+      // Adjust target based on drop position (above/below)
+      if (dragOverHalf.current === 'bottom' && toIndex > fromIndex) {
+        // Already moving down, toIndex is correct
+      } else if (dragOverHalf.current === 'top' && toIndex < fromIndex) {
+        // Already moving up, toIndex is correct
+      } else if (dragOverHalf.current === 'bottom') {
+        toIndex += 1
+      }
+
+      // Remove and reinsert
+      const [moved] = colTasks.splice(fromIndex, 1)
+      const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex
+      colTasks.splice(insertAt, 0, moved)
+
+      // Update positions in local state
+      const updatedIds = colTasks.map(t => t.id)
+      const positionMap = Object.fromEntries(updatedIds.map((id, i) => [id, i]))
+      setTasks(prev => prev.map(t => positionMap[t.id] !== undefined ? { ...t, position: positionMap[t.id] } : t))
+
+      // Persist to backend
+      fetch('/api/tasks/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds: updatedIds }),
+      })
+    } else if (!sameColumn) {
+      // Move to different column (existing behavior)
+      moveTask(dragged.id, colId)
     }
+
     setDraggingId(null)
     setDragOver(null)
+    setDragOverTaskId(null)
     dragTask.current = null
   }
 
@@ -316,8 +368,11 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
                       col={col}
                       isDragging={draggingId === task.id}
                       isDeleting={deletingIds.has(task.id)}
+                      isDropTarget={dragOverTaskId === task.id && draggingId !== task.id}
+                      dropHalf={dragOverHalf.current}
                       onDragStart={() => onDragStart(task)}
                       onDragEnd={onDragEnd}
+                      onCardDragOver={(e) => onCardDragOver(e, task.id)}
                       onUpdateTitle={t => updateTitle(task.id, t)}
                       onMove={moveTask}
                       onDelete={deleteTask}
@@ -449,13 +504,16 @@ function PriorityDropdown({ current, onSelect, anchorRef }: { current: string; o
   )
 }
 
-function KanbanCard({ task, col, isDragging, isDeleting, onDragStart, onDragEnd, onUpdateTitle, onMove, onDelete, onOpenDetail, onUpdateField, columns }: {
+function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf, onDragStart, onDragEnd, onCardDragOver, onUpdateTitle, onMove, onDelete, onOpenDetail, onUpdateField, columns }: {
   task: Task
   col: typeof COLUMNS[0]
   isDragging: boolean
   isDeleting?: boolean
+  isDropTarget?: boolean
+  dropHalf?: 'top' | 'bottom'
   onDragStart: () => void
   onDragEnd: () => void
+  onCardDragOver: (e: React.DragEvent) => void
   onUpdateTitle: (t: string) => void
   onMove: (id: string, status: string) => void
   onDelete: (id: string) => void
@@ -474,26 +532,32 @@ function KanbanCard({ task, col, isDragging, isDeleting, onDragStart, onDragEnd,
   const otherCols = columns.filter(c => c.id !== task.status)
 
   return (
-    <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onClick={(e) => {
-        const target = e.target as HTMLElement
-        if (target.closest('button') || target.closest('input') || target.closest('[data-no-modal]')) return
-        onOpenDetail()
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setMenuOpen(false); setPriorityOpen(false) }}
-      style={{
-        ...c.card,
-        ...(isDragging ? c.dragging : {}),
-        ...(hovered && !isDragging ? c.hover : {}),
-        borderLeftColor: col.accent,
-        cursor: 'pointer',
-        ...(isDeleting ? { animation: 'fadeOutShrink 0.35s ease forwards', pointerEvents: 'none' as const } : {}),
-      }}
-    >
+    <div style={{ position: 'relative' }}>
+      {/* Drop indicator line */}
+      {isDropTarget && dropHalf === 'top' && (
+        <div style={c.dropIndicatorTop} />
+      )}
+      <div
+        draggable
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragOver={onCardDragOver}
+        onClick={(e) => {
+          const target = e.target as HTMLElement
+          if (target.closest('button') || target.closest('input') || target.closest('[data-no-modal]')) return
+          onOpenDetail()
+        }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => { setHovered(false); setMenuOpen(false); setPriorityOpen(false) }}
+        style={{
+          ...c.card,
+          ...(isDragging ? c.dragging : {}),
+          ...(hovered && !isDragging ? c.hover : {}),
+          borderLeftColor: col.accent,
+          cursor: 'pointer',
+          ...(isDeleting ? { animation: 'fadeOutShrink 0.35s ease forwards', pointerEvents: 'none' as const } : {}),
+        }}
+      >
       {/* Left accent stripe */}
       <div style={{ ...c.stripe, background: col.bar }} />
 
@@ -578,6 +642,11 @@ function KanbanCard({ task, col, isDragging, isDeleting, onDragStart, onDragEnd,
           </div>
         </div>
       </div>
+      </div>
+      {/* Drop indicator line (bottom) */}
+      {isDropTarget && dropHalf === 'bottom' && (
+        <div style={c.dropIndicatorBottom} />
+      )}
     </div>
   )
 }
@@ -713,6 +782,20 @@ const c: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
   dragging: { opacity: 0.35, transform: 'scale(0.98)', cursor: 'grabbing' },
+  dropIndicatorTop: {
+    position: 'absolute' as const, top: '-4px', left: '4px', right: '4px',
+    height: '3px', borderRadius: '2px',
+    background: 'linear-gradient(90deg, #7c5cfc, #a78bfa)',
+    boxShadow: '0 0 8px rgba(124,92,252,0.5)',
+    zIndex: 10,
+  },
+  dropIndicatorBottom: {
+    position: 'absolute' as const, bottom: '-4px', left: '4px', right: '4px',
+    height: '3px', borderRadius: '2px',
+    background: 'linear-gradient(90deg, #7c5cfc, #a78bfa)',
+    boxShadow: '0 0 8px rgba(124,92,252,0.5)',
+    zIndex: 10,
+  },
   hover: {
     background: 'linear-gradient(180deg, #262740 0%, #1e1f34 100%)',
     boxShadow: '0 4px 12px rgba(0,0,0,0.35)',

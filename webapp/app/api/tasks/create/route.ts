@@ -48,11 +48,29 @@ export async function POST(request: NextRequest) {
     user_id: taskUserId,
     workspace_id: ws.id,
     status: status || 'active',
+    position: 0,
   }
 
   if (priority) insert.priority = priority
   if (due_date) insert.due_date = due_date
   if (taskTeamId) insert.team_id = taskTeamId
+
+  // Shift existing tasks down to make room at position 0
+  const targetStatus = status || 'active'
+  const { data: existingTasks } = await admin
+    .from('tasks')
+    .select('id, position')
+    .eq('user_id', taskUserId)
+    .eq('status', targetStatus)
+    .not('status', 'eq', 'deleted')
+    .order('position', { ascending: true })
+  if (existingTasks && existingTasks.length > 0) {
+    await Promise.all(
+      existingTasks.map((t: { id: string; position: number | null }) =>
+        admin.from('tasks').update({ position: (t.position ?? 0) + 1 }).eq('id', t.id)
+      )
+    )
+  }
 
   const { data: task, error } = await admin
     .from('tasks')

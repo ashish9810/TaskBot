@@ -27,6 +27,7 @@ export async function GET() {
       .select('*')
       .or(`user_id.eq.${slackLink.slack_user_id},user_id.eq.${user.id}`)
       .not('status', 'eq', 'deleted')
+      .order('position', { ascending: true })
       .order('created_at', { ascending: false })
     tasks = data
   } else {
@@ -35,6 +36,7 @@ export async function GET() {
       .select('*')
       .eq('user_id', user.id)
       .not('status', 'eq', 'deleted')
+      .order('position', { ascending: true })
       .order('created_at', { ascending: false })
     tasks = data
   }
