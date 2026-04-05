@@ -50,6 +50,8 @@ function initBot() {
       'groups:history',
       'groups:read',
       'im:history',
+      'mpim:history',
+      'mpim:read',
       'im:read',
       'im:write',
       'users:read',
