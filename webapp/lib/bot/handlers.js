@@ -1067,7 +1067,7 @@ function registerHandlers(app, supabase, maps) {
   // ── DM MESSAGE ──
   app.message(async ({ message, client, say }) => {
     if (message.subtype || message.bot_id) return;
-    if (message.channel_type !== 'im' && message.channel_type !== 'mpim') return;
+    if (message.channel_type !== 'im') return;
 
     const userId = message.user;
     const text = (message.text || '').trim();
