@@ -26,7 +26,7 @@ function buildNavBar(activeMode) {
     type: "actions",
     elements: [
       btn("My Tasks", "nav_my_tasks", "tasks"),
-      btn("People", "nav_people", "people"),
+      // btn("People", "nav_people", "people"),  // Hidden — emails exposed feels spooky
       btn("📌 Pinned", "nav_pinned", "pinned")
     ]
   };
