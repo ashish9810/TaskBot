@@ -12,14 +12,15 @@ export async function POST(request: NextRequest) {
 
   const normalizedEmail = email.toLowerCase().trim()
 
-  // Check both profiles (web accounts) and users (Slack-synced) in parallel
-  const [{ data: profile }, { data: slackUser }] = await Promise.all([
-    admin.from('profiles').select('id').eq('email', normalizedEmail).maybeSingle(),
-    admin.from('users').select('slack_user_id').ilike('email', normalizedEmail).limit(1).maybeSingle(),
-  ])
+  // Only check profiles (completed web signups) — users table is Slack sync data, not auth
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('email', normalizedEmail)
+    .maybeSingle()
 
   // Introduce a small constant-time delay to prevent timing-based enumeration
   await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 50))
 
-  return NextResponse.json({ exists: !!profile, slackUserFound: !!slackUser })
+  return NextResponse.json({ exists: !!profile })
 }

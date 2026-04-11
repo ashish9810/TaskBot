@@ -64,9 +64,44 @@ function SignupForm() {
       setLoading(false)
       const msg = error.message.toLowerCase()
       if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('user already')) {
+        // Try to clean up orphaned auth record (exists in auth but no profile = never completed signup)
+        try {
+          const cleanupRes = await fetch('/api/auth/cleanup-orphan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim() }),
+          })
+          const cleanup = await cleanupRes.json()
+
+          if (cleanup.cleared) {
+            // Orphan deleted — retry signup
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+            const retryResult = await supabase.auth.signUp({
+              email, password,
+              options: { data: { name }, emailRedirectTo: `${appUrl}/auth/callback` },
+            })
+            if (!retryResult.error && retryResult.data.session) {
+              if (retryResult.data.user) {
+                await supabase.from('profiles').upsert({ id: retryResult.data.user.id, email, name })
+                await fetch('/api/auth/sync-slack', { method: 'POST' })
+              }
+              router.push(nextUrl)
+              router.refresh()
+              return
+            }
+            if (!retryResult.error && !retryResult.data.session) {
+              setLoading(false)
+              setScreen('check-email')
+              return
+            }
+          }
+        } catch { /* fall through to error message */ }
+
+        setLoading(false)
         setErrors({
           general: `An account with ${email} already exists. Try signing in instead, or reset your password if you've forgotten it.`,
         })
+        return
       } else if (msg.includes('invalid email')) {
         setErrors({ email: "That email address isn't valid. Please double-check it." })
       } else if (msg.includes('weak password') || msg.includes('password should')) {
@@ -231,6 +266,13 @@ function SignupForm() {
           <Link href="/login" style={s.link}>Sign in</Link>
         </p>
       </div>
+
+      {loading && (
+        <div style={s.overlay}>
+          <div style={s.overlaySpinner} />
+          <p style={s.overlayText}>Creating your account…</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -269,6 +311,9 @@ const s: Record<string, React.CSSProperties> = {
   resendBtn: { width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '14px', color: 'var(--text)', cursor: 'pointer', fontFamily: 'inherit', transition: 'opacity 0.2s' },
   resendBtnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
   backBtn: { background: 'none', border: 'none', color: 'var(--accent)', fontSize: '14px', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontWeight: 500 },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(10, 10, 18, 0.75)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', gap: '16px', zIndex: 50 },
+  overlaySpinner: { width: '32px', height: '32px', border: '3px solid rgba(124, 92, 252, 0.25)', borderTopColor: '#7c5cfc', borderRadius: '50%', animation: 'spin 0.7s linear infinite' },
+  overlayText: { fontSize: '15px', fontWeight: 500, color: 'rgba(238, 238, 248, 0.85)', letterSpacing: '-0.01em' },
 }
 
 export default function SignupPage() {
