@@ -29,8 +29,9 @@ export default function JoinClient({ token, workspaceName, isLoggedIn, userId }:
       })
 
       if (res.status === 409) {
-        setError("You're already in a workspace. You can only belong to one workspace for now.")
-        setJoining(false)
+        // Already in a workspace — most likely auto-joined during signup via sync-slack
+        router.push('/dashboard')
+        router.refresh()
         return
       }
 
