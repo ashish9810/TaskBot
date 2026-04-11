@@ -650,6 +650,9 @@ async function buildPersonTasksBlocks(targetUserId, teamId, supabase) {
 // =============================
 
 async function publishHome(client, userId, teamId, supabase, mode = 'my_tasks', searchQuery = '', page = 0) {
+  // People and Pinned views are hidden — always fall back to my_tasks
+  if (mode === 'people' || mode === 'pinned') mode = 'my_tasks';
+
   let blocks;
 
   if (mode === 'people') {
