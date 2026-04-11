@@ -63,6 +63,12 @@ body {
   100% { opacity: 1; }
 }
 
+@keyframes dropFlash {
+  0% { box-shadow: 0 0 0 2px rgba(124,92,252,0.7), 0 0 16px rgba(124,92,252,0.4); transform: scale(1.02); }
+  50% { box-shadow: 0 0 0 2px rgba(124,92,252,0.4), 0 0 8px rgba(124,92,252,0.2); transform: scale(1); }
+  100% { box-shadow: none; transform: scale(1); }
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }

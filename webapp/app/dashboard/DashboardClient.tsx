@@ -77,8 +77,10 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   const [showSlackToast, setShowSlackToast] = useState(false)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [flashField, setFlashField] = useState<string | null>(null)
+  const [dragOverHalf, setDragOverHalf] = useState<'top' | 'bottom'>('bottom')
+  const [justDroppedId, setJustDroppedId] = useState<string | null>(null)
   const dragTask = useRef<Task | null>(null)
-  const dragOverHalf = useRef<'top' | 'bottom'>('bottom')
+  const dragOverHalfRef = useRef<'top' | 'bottom'>('bottom')
   const reorderCooldown = useRef(false)
   const searchParams = useSearchParams()
 
@@ -223,7 +225,9 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
     e.stopPropagation()
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const midY = rect.top + rect.height / 2
-    dragOverHalf.current = e.clientY < midY ? 'top' : 'bottom'
+    const half = e.clientY < midY ? 'top' : 'bottom'
+    dragOverHalfRef.current = half
+    setDragOverHalf(half)
     setDragOverTaskId(taskId)
   }
 
@@ -244,13 +248,17 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
 
       // Calculate insert position: if dropping on bottom half, insert after target
       const targetIndex = colTasks.findIndex(t => t.id === dragOverTaskId)
-      const insertAt = dragOverHalf.current === 'bottom' ? targetIndex + 1 : targetIndex
+      const insertAt = dragOverHalfRef.current === 'bottom' ? targetIndex + 1 : targetIndex
       colTasks.splice(insertAt, 0, moved)
 
       // Update positions in local state
       const updatedIds = colTasks.map(t => t.id)
       const positionMap = Object.fromEntries(updatedIds.map((id, i) => [id, i]))
       setTasks(prev => prev.map(t => positionMap[t.id] !== undefined ? { ...t, position: positionMap[t.id] } : t))
+
+      // Flash the dropped card briefly
+      setJustDroppedId(dragged.id)
+      setTimeout(() => setJustDroppedId(null), 600)
 
       // Suppress realtime refreshes while backend catches up
       reorderCooldown.current = true
@@ -265,6 +273,8 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
     } else if (!sameColumn) {
       // Move to different column (existing behavior)
       moveTask(dragged.id, colId)
+      setJustDroppedId(dragged.id)
+      setTimeout(() => setJustDroppedId(null), 600)
     }
 
     setDraggingId(null)
@@ -372,7 +382,8 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
                       isDragging={draggingId === task.id}
                       isDeleting={deletingIds.has(task.id)}
                       isDropTarget={dragOverTaskId === task.id && draggingId !== task.id}
-                      dropHalf={dragOverHalf.current}
+                      dropHalf={dragOverHalf}
+                      isJustDropped={justDroppedId === task.id}
                       onDragStart={() => onDragStart(task)}
                       onDragEnd={onDragEnd}
                       onCardDragOver={(e) => onCardDragOver(e, task.id)}
@@ -507,13 +518,14 @@ function PriorityDropdown({ current, onSelect, anchorRef }: { current: string; o
   )
 }
 
-function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf, onDragStart, onDragEnd, onCardDragOver, onUpdateTitle, onMove, onDelete, onOpenDetail, onUpdateField, columns }: {
+function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf, isJustDropped, onDragStart, onDragEnd, onCardDragOver, onUpdateTitle, onMove, onDelete, onOpenDetail, onUpdateField, columns }: {
   task: Task
   col: typeof COLUMNS[0]
   isDragging: boolean
   isDeleting?: boolean
   isDropTarget?: boolean
   dropHalf?: 'top' | 'bottom'
+  isJustDropped?: boolean
   onDragStart: () => void
   onDragEnd: () => void
   onCardDragOver: (e: React.DragEvent) => void
@@ -559,6 +571,7 @@ function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf,
           borderLeftColor: col.accent,
           cursor: 'pointer',
           ...(isDeleting ? { animation: 'fadeOutShrink 0.35s ease forwards', pointerEvents: 'none' as const } : {}),
+          ...(isJustDropped ? { animation: 'dropFlash 0.6s ease' } : {}),
         }}
       >
       {/* Left accent stripe */}
