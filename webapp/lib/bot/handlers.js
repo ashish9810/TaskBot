@@ -117,6 +117,7 @@ async function buildMyTasksView(userId, teamId, supabase) {
     supabase.from('updates').select('id, task_id').eq('user_id', userId).eq('team_id', teamId)
   ]);
 
+  const MAX_TASKS = 5; // Slack limit: 100 blocks per view
   const backlog    = (allTasks || []).filter(t => t.status === 'backlog');
   const active     = (allTasks || []).filter(t => t.status === 'active');
   const inProgress = (allTasks || []).filter(t => t.status === 'in_progress');
@@ -140,7 +141,7 @@ async function buildMyTasksView(userId, teamId, supabase) {
       text: { type: "mrkdwn", text: "_No incoming tasks._" }
     });
   } else {
-    for (const task of backlog) {
+    for (const task of backlog.slice(0, MAX_TASKS)) {
       blocks.push({
         type: "section",
         fields: [
@@ -170,6 +171,9 @@ async function buildMyTasksView(userId, teamId, supabase) {
       });
       blocks.push({ type: "divider" });
     }
+    if (backlog.length > MAX_TASKS) {
+      blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: `_...and ${backlog.length - MAX_TASKS} more in inbox_` }] });
+    }
   }
 
   // TO DO
@@ -184,7 +188,7 @@ async function buildMyTasksView(userId, teamId, supabase) {
       text: { type: "mrkdwn", text: "_No tasks to do. Add one above!_" }
     });
   } else {
-    for (const task of active) {
+    for (const task of active.slice(0, MAX_TASKS)) {
       const hasUpdates = (updatesByTaskId[task.id] || 0) > 0;
       const updateCount = updatesByTaskId[task.id] || 0;
 
@@ -239,6 +243,9 @@ async function buildMyTasksView(userId, teamId, supabase) {
       blocks.push({ type: "actions", elements: buttons });
       blocks.push({ type: "divider" });
     }
+    if (active.length > MAX_TASKS) {
+      blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: `_...and ${active.length - MAX_TASKS} more to do_` }] });
+    }
   }
 
   // IN PROGRESS
@@ -253,7 +260,7 @@ async function buildMyTasksView(userId, teamId, supabase) {
       text: { type: "mrkdwn", text: "_No tasks in progress._" }
     });
   } else {
-    for (const task of inProgress) {
+    for (const task of inProgress.slice(0, MAX_TASKS)) {
       const hasUpdates = (updatesByTaskId[task.id] || 0) > 0;
       const updateCount = updatesByTaskId[task.id] || 0;
 
@@ -302,6 +309,9 @@ async function buildMyTasksView(userId, teamId, supabase) {
       blocks.push({ type: "actions", elements: buttons });
       blocks.push({ type: "divider" });
     }
+    if (inProgress.length > MAX_TASKS) {
+      blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: `_...and ${inProgress.length - MAX_TASKS} more in progress_` }] });
+    }
   }
 
   // COMPLETED
@@ -316,7 +326,7 @@ async function buildMyTasksView(userId, teamId, supabase) {
       text: { type: "mrkdwn", text: "_No completed tasks yet._" }
     });
   } else {
-    for (const task of completed) {
+    for (const task of completed.slice(0, MAX_TASKS)) {
       const hasUpdates = (updatesByTaskId[task.id] || 0) > 0;
       const updateCount = updatesByTaskId[task.id] || 0;
 
@@ -343,6 +353,9 @@ async function buildMyTasksView(userId, teamId, supabase) {
       }
 
       blocks.push({ type: "divider" });
+    }
+    if (completed.length > MAX_TASKS) {
+      blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: `_...and ${completed.length - MAX_TASKS} more completed_` }] });
     }
   }
 
