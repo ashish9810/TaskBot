@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase-server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { redirect } from 'next/navigation'
 import JoinClient from './JoinClient'
 
 type Props = { params: Promise<{ token: string }> }
@@ -36,6 +37,20 @@ export default async function JoinPage({ params }: Props) {
 
   // Check if user is already logged in
   const { data: { user } } = await supabase.auth.getUser()
+
+  // If logged in, check if already a member of this workspace (e.g. auto-joined via sync-slack)
+  if (user) {
+    const { data: membership } = await admin
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('profile_id', user.id)
+      .eq('workspace_id', invite.workspace_id)
+      .maybeSingle()
+
+    if (membership) {
+      redirect('/dashboard')
+    }
+  }
 
   return (
     <JoinClient
