@@ -197,7 +197,7 @@ function SignupForm() {
               type="text"
               value={name}
               onChange={e => { setName(e.target.value); setErrors(p => ({ ...p, name: undefined })) }}
-              placeholder="Ashish Kumar"
+              placeholder="Enter your name"
               style={{ ...s.input, ...(errors.name ? s.inputErr : {}) }}
               autoComplete="name"
               autoFocus
