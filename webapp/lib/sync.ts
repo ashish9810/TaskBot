@@ -42,7 +42,7 @@ export async function autoJoinSlackWorkspace(
   // 1. Find all Slack users with this email
   const { data: slackUsers } = await admin
     .from('users')
-    .select('slack_user_id, team_id')
+    .select('slack_user_id, team_id, name')
     .ilike('email', email)
 
   if (!slackUsers || slackUsers.length === 0) {
@@ -59,6 +59,15 @@ export async function autoJoinSlackWorkspace(
   await admin
     .from('profile_slack_links')
     .upsert(links, { onConflict: 'slack_user_id,team_id' })
+
+  // Sync Slack name → profile (Slack is source of truth for name)
+  const slackName = slackUsers.find(u => u.name)?.name
+  if (slackName) {
+    await admin
+      .from('profiles')
+      .update({ name: slackName })
+      .eq('id', profileId)
+  }
 
   // 3. Check if user already belongs to any workspace (MVP: one workspace per email)
   const { data: existingMembership } = await admin

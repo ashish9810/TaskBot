@@ -82,10 +82,14 @@ export default async function PeoplePage() {
     }
   })
 
+  // Filter out Slack users who already appear as workspace members
+  const memberEmails = new Set(memberList.map(m => m.email.toLowerCase()).filter(Boolean))
+  const filteredSlackUsers = slackUsers.filter(u => !u.email || !memberEmails.has(u.email.toLowerCase()))
+
   return (
     <MembersClient
       members={memberList}
-      slackUsers={slackUsers}
+      slackUsers={filteredSlackUsers}
       workspaceId={workspace.id}
       workspaceName={workspace.name}
       currentUserId={user.id}
