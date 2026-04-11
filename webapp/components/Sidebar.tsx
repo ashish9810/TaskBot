@@ -35,19 +35,13 @@ const navItems = [
       </svg>
     ),
   },
-  {
-    href: '/dashboard/people',
-    label: 'Members',
-    exactMatch: false,
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <circle cx="6" cy="5" r="2.5" fill="currentColor" opacity="0.9"/>
-        <path d="M1 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        <circle cx="12" cy="5" r="2" fill="currentColor" opacity="0.5"/>
-        <path d="M14 13c0-1.86-.8-3.53-2.07-4.68" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      </svg>
-    ),
-  },
+  // Members tab hidden — emails exposed feels spooky to users
+  // {
+  //   href: '/dashboard/people',
+  //   label: 'Members',
+  //   exactMatch: false,
+  //   icon: ( <svg>...</svg> ),
+  // },
 ]
 
 export default function Sidebar({ user, workspace, role }: Props) {
@@ -55,6 +49,31 @@ export default function Sidebar({ user, workspace, role }: Props) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [inviteCopied, setInviteCopied] = useState(false)
+  const [loadingInvite, setLoadingInvite] = useState(false)
+
+  async function handleInvite() {
+    if (inviteLink) {
+      await navigator.clipboard.writeText(inviteLink)
+      setInviteCopied(true)
+      setTimeout(() => setInviteCopied(false), 2000)
+      return
+    }
+    setLoadingInvite(true)
+    try {
+      const res = await fetch('/api/invites')
+      const data = await res.json()
+      if (data.token) {
+        const url = `${window.location.origin}/join/${data.token}`
+        setInviteLink(url)
+        await navigator.clipboard.writeText(url)
+        setInviteCopied(true)
+        setTimeout(() => setInviteCopied(false), 2000)
+      }
+    } catch { /* ignore */ }
+    setLoadingInvite(false)
+  }
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -164,16 +183,16 @@ export default function Sidebar({ user, workspace, role }: Props) {
           </div>
         )}
 
-        {/* Invite button for owners */}
+        {/* Invite button for owners — copies invite link to clipboard */}
         {role === 'owner' && !collapsed && (
-          <Link href="/dashboard/people" style={s.inviteBtn}>
+          <button onClick={handleInvite} disabled={loadingInvite} style={s.inviteBtn}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
               <circle cx="6" cy="5" r="3" stroke="currentColor" strokeWidth="1.4"/>
               <path d="M1 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
               <path d="M13 5v4M11 7h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
             </svg>
-            Invite teammates
-          </Link>
+            {loadingInvite ? 'Loading…' : inviteCopied ? 'Link copied!' : 'Invite teammates'}
+          </button>
         )}
 
         {/* User */}
@@ -294,7 +313,8 @@ const s: Record<string, React.CSSProperties> = {
     background: 'rgba(124,92,252,0.1)', border: '1px solid rgba(124,92,252,0.25)',
     borderRadius: '8px', padding: '8px 10px',
     fontSize: '12px', fontWeight: 500, color: 'var(--accent-light)',
-    textDecoration: 'none', whiteSpace: 'nowrap' as const,
+    cursor: 'pointer', fontFamily: 'inherit',
+    whiteSpace: 'nowrap' as const,
   },
   slackSection: { padding: '0 2px' },
   slackBtn: {
