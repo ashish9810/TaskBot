@@ -191,7 +191,7 @@ export default function Sidebar({ user, workspace, role }: Props) {
               <path d="M1 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
               <path d="M13 5v4M11 7h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
             </svg>
-            {loadingInvite ? 'Loading…' : inviteCopied ? 'Link copied!' : 'Invite teammates'}
+            {loadingInvite ? 'Loading…' : inviteCopied ? 'Link copied!' : 'Copy Invite Link'}
           </button>
         )}
 
