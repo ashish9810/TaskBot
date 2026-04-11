@@ -133,11 +133,12 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
+  const sortByPos = (a: Task, b: Task) => (a.position ?? Infinity) - (b.position ?? Infinity)
   const grouped = {
-    backlog:     tasks.filter(t => t.status === 'backlog'),
-    active:      tasks.filter(t => t.status === 'active'),
-    in_progress: tasks.filter(t => t.status === 'in_progress'),
-    completed:   tasks.filter(t => t.status === 'completed'),
+    backlog:     tasks.filter(t => t.status === 'backlog').sort(sortByPos),
+    active:      tasks.filter(t => t.status === 'active').sort(sortByPos),
+    in_progress: tasks.filter(t => t.status === 'in_progress').sort(sortByPos),
+    completed:   tasks.filter(t => t.status === 'completed').sort(sortByPos),
   } as Record<string, Task[]>
 
   const activeCount = tasks.filter(t => t.status === 'backlog' || t.status === 'active' || t.status === 'in_progress').length
