@@ -1,6 +1,6 @@
 const { parseTasks, extractTasksFromThread, formatThreadForLLM } = require('./parse-tasks');
 const { activeStandups, handleStandupReply } = require('./standup');
-const { understandIntent, buildTaskListMessage, buildSummaryMessage, STATUS_LABELS, UNKNOWN_RESPONSE } = require('./conversation');
+const { runConversation, STATUS_LABELS } = require('./tools');
 
 // Helper to get team_id from body
 function getTeamId(body) {
@@ -840,92 +840,138 @@ function registerHandlers(app, supabase, maps) {
           return;
         }
 
-        // Store in pendingBulkCreations (reuse existing confirm/cancel flow)
-        const formattedTasks = tasks.map(t => ({
-          title: t.title,
-          assignee_slack_id: t.assignee_slack_id || null,
-          assignee_hint: t.assignee_name || null,
-        }));
+        // ── AUTO-CREATE TASKS (no checkbox confirmation) ──
+        // Self-assigned → status 'active' (To Do).
+        // Assigned to someone else → status 'backlog' + DM the assignee with Track/Ignore buttons.
+        const workspaceId = await getWorkspaceId(teamId, supabase);
+        const webUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-        pendingBulkCreations.set(event.user, {
-          tasks: formattedTasks,
-          teamId,
-          channelId: event.channel,
-          threadTs: event.thread_ts,
-          mentionedUsers: [...userMap.entries()]
-            .filter(([id]) => id !== botUserId)
-            .map(([slack_user_id, name]) => ({ slack_user_id, name })),
-          timestamp: Date.now(),
-        });
+        let createdSelf = 0;
+        const createdForOthers = []; // { taskId, title, assigneeId, assigneeName }
+        const createFailures = [];
 
-        // Build checkbox options
-        const checkboxOptions = formattedTasks.map((task, i) => {
-          let label = task.title.substring(0, 55);
-          const assigneeId = task.assignee_slack_id;
-          if (assigneeId) {
-            const assigneeName = userMap.get(assigneeId)?.split(' ')[0] || 'someone';
-            label += ` → ${assigneeName}`;
-          } else {
-            label += ' → unassigned';
-          }
-          return {
-            text: { type: 'plain_text', text: label.substring(0, 75) },
-            value: String(i),
+        for (const t of tasks) {
+          const rawAssignee = t.assignee_slack_id || null;
+          const isSelf = !rawAssignee || rawAssignee === event.user;
+          const assigneeId = isSelf ? event.user : rawAssignee;
+          const status = isSelf ? 'active' : 'backlog';
+
+          const insert = {
+            title: t.title,
+            user_id: assigneeId,
+            team_id: teamId,
+            status,
+            assigned_by: event.user,
+            ...(workspaceId ? { workspace_id: workspaceId } : {}),
           };
-        });
 
-        const blocks = [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `:mag: *Thread summary:* ${result.summary}`,
-            },
-          },
-          { type: 'divider' },
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `:clipboard: <@${event.user}>, I found *${tasks.length} task(s)* in this thread:`,
-            },
-          },
-          {
-            type: 'actions',
-            block_id: 'bulk_task_checkboxes',
-            elements: [{
-              type: 'checkboxes',
-              action_id: 'bulk_task_selection',
-              initial_options: checkboxOptions,
-              options: checkboxOptions,
-            }],
-          },
-          {
-            type: 'actions',
-            elements: [
-              {
-                type: 'button',
-                text: { type: 'plain_text', text: ':white_check_mark: Create Selected' },
-                style: 'primary',
-                action_id: 'bulk_create_confirm',
-                value: event.user,
-              },
-              {
-                type: 'button',
-                text: { type: 'plain_text', text: ':x: Cancel' },
-                action_id: 'bulk_create_cancel',
-                value: event.user,
-              },
-            ],
-          },
-        ];
+          const { data: inserted, error } = await supabase
+            .from('tasks')
+            .insert(insert)
+            .select()
+            .single();
+
+          if (error || !inserted) {
+            console.error('[thread_auto_create] Insert failed:', error?.message);
+            createFailures.push(t.title);
+            continue;
+          }
+
+          if (isSelf) {
+            createdSelf++;
+          } else {
+            createdForOthers.push({
+              taskId: inserted.id,
+              title: inserted.title,
+              assigneeId,
+              assigneeName: userMap.get(assigneeId) || 'teammate',
+            });
+          }
+        }
+
+        // DM each external assignee with Track / Ignore buttons
+        for (const assigned of createdForOthers) {
+          try {
+            await client.chat.postMessage({
+              channel: assigned.assigneeId,
+              text: `:wave: <@${event.user}> assigned you a task from a thread: ${assigned.title}`,
+              blocks: [
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: `:wave: Hey! <@${event.user}> assigned you a task from a thread:\n*${assigned.title}*`,
+                  },
+                },
+                {
+                  type: 'context',
+                  elements: [{
+                    type: 'mrkdwn',
+                    text: `_From <#${event.channel}>_ · <${webUrl}/dashboard|Open dashboard>`,
+                  }],
+                },
+                {
+                  type: 'actions',
+                  elements: [
+                    {
+                      type: 'button',
+                      text: { type: 'plain_text', text: ':white_check_mark: Track' },
+                      style: 'primary',
+                      action_id: 'track_assigned_task',
+                      value: assigned.taskId,
+                    },
+                    {
+                      type: 'button',
+                      text: { type: 'plain_text', text: ':x: Ignore' },
+                      action_id: 'ignore_assigned_task',
+                      value: assigned.taskId,
+                    },
+                  ],
+                },
+              ],
+            });
+          } catch (e) {
+            console.error('[thread_auto_create] DM to assignee failed (non-fatal):', e.message);
+          }
+        }
+
+        // Thread summary reply
+        const summaryLines = [];
+        if (result.summary) summaryLines.push(`:mag: *Thread summary:* ${result.summary}`);
+        summaryLines.push('');
+        const totalCreated = createdSelf + createdForOthers.length;
+        summaryLines.push(`:white_check_mark: Created *${totalCreated} task(s)* from this thread:`);
+        if (createdSelf > 0) {
+          summaryLines.push(`• *${createdSelf}* added to your To Do (<@${event.user}>).`);
+        }
+        if (createdForOthers.length > 0) {
+          const grouped = {};
+          for (const t of createdForOthers) {
+            grouped[t.assigneeId] = grouped[t.assigneeId] || [];
+            grouped[t.assigneeId].push(t.title);
+          }
+          for (const [aid, titles] of Object.entries(grouped)) {
+            summaryLines.push(`• *${titles.length}* sent to <@${aid}> (awaiting Track/Ignore).`);
+          }
+        }
+        if (createFailures.length > 0) {
+          summaryLines.push(`:warning: Couldn't create ${createFailures.length} task(s): ${createFailures.map(t => `"${t}"`).join(', ')}`);
+        }
 
         await client.chat.postMessage({
           channel: event.channel,
           thread_ts: event.thread_ts,
-          text: `I found ${tasks.length} task(s) from this thread:`,
-          blocks,
+          text: `Created ${totalCreated} task(s) from this thread.`,
+          blocks: [{
+            type: 'section',
+            text: { type: 'mrkdwn', text: summaryLines.join('\n') },
+          }],
         });
+
+        // Refresh requester's home tab if any task was self-assigned
+        if (createdSelf > 0) {
+          try { await publishHome(client, event.user, teamId, supabase, 'my_tasks'); } catch {}
+        }
 
         await client.reactions.remove({ channel: event.channel, timestamp: event.ts, name: 'hourglass_flowing_sand' }).catch(() => {});
         return;
@@ -1081,6 +1127,8 @@ function registerHandlers(app, supabase, maps) {
   });
 
   // ── DM MESSAGE ──
+  // Fully conversational — powered by Groq tool calling via lib/bot/tools.js.
+  // Multi-turn history is persisted in dmContext per-user with a 1-hour TTL.
   app.message(async ({ message, client, say }) => {
     if (message.subtype || message.bot_id) return;
     if (message.channel_type !== 'im') return;
@@ -1133,366 +1181,46 @@ function registerHandlers(app, supabase, maps) {
 
     try {
       const taskContext = await getUserTaskContext(userId, teamId, supabase);
-      const ctx = dmContext.get(userId) || null;
-      const recentList = ctx?.recentList || null;
+      const workspaceId = await getWorkspaceId(teamId, supabase);
 
-      const intent = await understandIntent(text, taskContext, recentList);
-      console.log('[DM] Intent:', JSON.stringify(intent));
+      // Load persisted conversation history for this user (1-hour TTL, capped at 20 messages).
+      const now = Date.now();
+      const prev = dmContext.get(userId);
+      const freshHistory = prev && prev.chatHistory && (now - (prev.chatTimestamp || 0) < 60 * 60 * 1000)
+        ? prev.chatHistory
+        : [];
+
+      const result = await runConversation({
+        userMessage: text,
+        history: freshHistory,
+        taskContext,
+        ctx: {
+          supabase,
+          userId,
+          teamId,
+          workspaceId,
+        },
+      });
 
       await removeThinking();
 
-      if (intent.intent === 'unknown') {
-        await say(UNKNOWN_RESPONSE);
-        return;
+      const reply = result.reply || ":thinking_face: I'm not sure how to help with that — could you rephrase?";
+      await say(reply);
+
+      // Persist history (trim to last 20 messages)
+      const trimmed = (result.updatedHistory || []).slice(-20);
+      dmContext.set(userId, {
+        ...(prev || {}),
+        chatHistory: trimmed,
+        chatTimestamp: now,
+        teamId,
+        timestamp: now,
+      });
+
+      // Refresh home tab if anything was actually executed (created/moved/deleted)
+      if (result.executed) {
+        try { await publishHome(client, userId, teamId, supabase, 'my_tasks'); } catch {}
       }
-
-      if (intent.intent === 'summary') {
-        const summary = buildSummaryMessage(taskContext);
-        await say(summary);
-        return;
-      }
-
-      if (intent.intent === 'view') {
-        const status = intent.sourceStatus || 'active';
-        const tasks = taskContext[status] || [];
-        const label = STATUS_LABELS[status] || status;
-        const { text: listText, numberedTasks } = buildTaskListMessage(tasks, label);
-        dmContext.set(userId, { recentList: numberedTasks, teamId, timestamp: Date.now() });
-        await say(listText + '\n\nYou can say things like _"move 1, 3 to in progress"_ or _"delete 2"_.');
-        return;
-      }
-
-      if (intent.intent === 'create' && intent.createTasks && intent.createTasks.length > 0) {
-        const tasks = intent.createTasks;
-        pendingBulkCreations.set(userId, {
-          tasks,
-          teamId,
-          timestamp: Date.now()
-        });
-
-        const checkboxOptions = tasks.map((task, i) => ({
-          text: { type: 'plain_text', text: task.title.substring(0, 75) },
-          value: String(i)
-        }));
-
-        await say({
-          text: `I found ${tasks.length} task(s) to create:`,
-          blocks: [
-            {
-              type: 'section',
-              text: { type: 'mrkdwn', text: `:clipboard: I found *${tasks.length} task(s)* to create:` }
-            },
-            {
-              type: 'actions',
-              block_id: 'bulk_task_checkboxes',
-              elements: [{
-                type: 'checkboxes',
-                action_id: 'bulk_task_selection',
-                initial_options: checkboxOptions,
-                options: checkboxOptions
-              }]
-            },
-            {
-              type: 'actions',
-              elements: [
-                {
-                  type: 'button',
-                  text: { type: 'plain_text', text: ':white_check_mark: Create Selected' },
-                  style: 'primary',
-                  action_id: 'bulk_create_confirm',
-                  value: userId
-                },
-                {
-                  type: 'button',
-                  text: { type: 'plain_text', text: ':x: Cancel' },
-                  action_id: 'bulk_create_cancel',
-                  value: userId
-                }
-              ]
-            }
-          ]
-        });
-        return;
-      }
-
-      if (intent.intent === 'move') {
-        const targetStatus = intent.targetStatus;
-        const targetLabel = STATUS_LABELS[targetStatus] || targetStatus;
-
-        if (intent.taskIndices && intent.taskIndices.length > 0 && recentList && recentList.length > 0) {
-          const selectedTasks = intent.taskIndices
-            .map(idx => recentList.find(t => t.index === idx))
-            .filter(Boolean);
-
-          if (selectedTasks.length > 0) {
-            dmContext.set(userId, {
-              recentList,
-              teamId,
-              pendingAction: { type: 'move', tasks: selectedTasks, targetStatus },
-              timestamp: Date.now()
-            });
-
-            const taskList = selectedTasks.map(t => `• ${t.title}`).join('\n');
-            await say({
-              text: `Moving to ${targetLabel}:\n${taskList}`,
-              blocks: [
-                {
-                  type: 'section',
-                  text: { type: 'mrkdwn', text: `Moving these to *${targetLabel}*:\n${taskList}` }
-                },
-                {
-                  type: 'actions',
-                  elements: [
-                    {
-                      type: 'button',
-                      text: { type: 'plain_text', text: ':white_check_mark: Confirm' },
-                      style: 'primary',
-                      action_id: 'dm_action_confirm',
-                      value: userId
-                    },
-                    {
-                      type: 'button',
-                      text: { type: 'plain_text', text: ':x: Cancel' },
-                      action_id: 'dm_action_cancel',
-                      value: userId
-                    }
-                  ]
-                }
-              ]
-            });
-            return;
-          }
-        }
-
-        const sourceStatus = intent.sourceStatus || (targetStatus === 'in_progress' ? 'active' : targetStatus === 'completed' ? 'in_progress' : 'active');
-        const sourceLabel = STATUS_LABELS[sourceStatus] || sourceStatus;
-        const tasks = taskContext[sourceStatus] || [];
-        const { text: listText, numberedTasks } = buildTaskListMessage(tasks, sourceLabel);
-
-        dmContext.set(userId, {
-          recentList: numberedTasks,
-          teamId,
-          pendingAction: { type: 'move', targetStatus },
-          timestamp: Date.now()
-        });
-
-        if (tasks.length === 0) {
-          await say(`You have no tasks in *${sourceLabel}* to move.`);
-          return;
-        }
-
-        await say(listText + `\n\nWhich task(s) do you want to move to *${targetLabel}*? Reply with the numbers (e.g. "1, 3, 4").`);
-        return;
-      }
-
-      if (intent.intent === 'delete') {
-        if (intent.scope === 'all' && intent.sourceStatus) {
-          const sourceLabel = STATUS_LABELS[intent.sourceStatus] || intent.sourceStatus;
-          const tasks = taskContext[intent.sourceStatus] || [];
-
-          if (tasks.length === 0) {
-            await say(`You have no tasks in *${sourceLabel}* to delete.`);
-            return;
-          }
-
-          const numberedTasks = tasks.map((t, i) => ({ index: i + 1, id: t.id, title: t.title, status: t.status }));
-
-          dmContext.set(userId, {
-            recentList: numberedTasks,
-            teamId,
-            pendingAction: { type: 'delete', tasks: numberedTasks, scope: 'all' },
-            timestamp: Date.now()
-          });
-
-          await say({
-            text: `Delete all ${tasks.length} tasks in ${sourceLabel}?`,
-            blocks: [
-              {
-                type: 'section',
-                text: { type: 'mrkdwn', text: `:warning: You have *${tasks.length} task(s)* in *${sourceLabel}*. Are you sure you want to delete *all* of them?` }
-              },
-              {
-                type: 'actions',
-                elements: [
-                  {
-                    type: 'button',
-                    text: { type: 'plain_text', text: ':wastebasket: Yes, delete all' },
-                    style: 'danger',
-                    action_id: 'dm_action_confirm',
-                    value: userId
-                  },
-                  {
-                    type: 'button',
-                    text: { type: 'plain_text', text: ':x: Cancel' },
-                    action_id: 'dm_action_cancel',
-                    value: userId
-                  }
-                ]
-              }
-            ]
-          });
-          return;
-        }
-
-        if (intent.taskIndices && intent.taskIndices.length > 0 && recentList && recentList.length > 0) {
-          const selectedTasks = intent.taskIndices
-            .map(idx => recentList.find(t => t.index === idx))
-            .filter(Boolean);
-
-          if (selectedTasks.length > 0) {
-            dmContext.set(userId, {
-              recentList,
-              teamId,
-              pendingAction: { type: 'delete', tasks: selectedTasks },
-              timestamp: Date.now()
-            });
-
-            const taskList = selectedTasks.map(t => `• ${t.title}`).join('\n');
-            await say({
-              text: `Delete these tasks?\n${taskList}`,
-              blocks: [
-                {
-                  type: 'section',
-                  text: { type: 'mrkdwn', text: `:warning: Delete these task(s)?\n${taskList}` }
-                },
-                {
-                  type: 'actions',
-                  elements: [
-                    {
-                      type: 'button',
-                      text: { type: 'plain_text', text: ':wastebasket: Yes, delete' },
-                      style: 'danger',
-                      action_id: 'dm_action_confirm',
-                      value: userId
-                    },
-                    {
-                      type: 'button',
-                      text: { type: 'plain_text', text: ':x: Cancel' },
-                      action_id: 'dm_action_cancel',
-                      value: userId
-                    }
-                  ]
-                }
-              ]
-            });
-            return;
-          }
-        }
-
-        const sourceStatus = intent.sourceStatus || 'active';
-        const sourceLabel = STATUS_LABELS[sourceStatus] || sourceStatus;
-        const tasks = taskContext[sourceStatus] || [];
-        const { text: listText, numberedTasks } = buildTaskListMessage(tasks, sourceLabel);
-
-        dmContext.set(userId, {
-          recentList: numberedTasks,
-          teamId,
-          pendingAction: { type: 'delete' },
-          timestamp: Date.now()
-        });
-
-        if (tasks.length === 0) {
-          await say(`You have no tasks in *${sourceLabel}* to delete.`);
-          return;
-        }
-
-        await say(listText + '\n\nWhich task(s) do you want to delete? Reply with the numbers (e.g. "2, 4").');
-        return;
-      }
-
-      // Follow-up: user replying with numbers to a previous list
-      if (ctx?.pendingAction && recentList && recentList.length > 0) {
-        const numbers = text.match(/\d+/g);
-        if (numbers && numbers.length > 0) {
-          const indices = numbers.map(n => parseInt(n)).filter(n => n >= 1 && n <= recentList.length);
-          const selectedTasks = indices.map(idx => recentList.find(t => t.index === idx)).filter(Boolean);
-
-          if (selectedTasks.length > 0) {
-            const action = ctx.pendingAction;
-
-            if (action.type === 'move') {
-              const targetLabel = STATUS_LABELS[action.targetStatus] || action.targetStatus;
-
-              dmContext.set(userId, {
-                ...ctx,
-                pendingAction: { ...action, tasks: selectedTasks },
-                timestamp: Date.now()
-              });
-
-              const taskList = selectedTasks.map(t => `• ${t.title}`).join('\n');
-              await say({
-                text: `Moving to ${targetLabel}:\n${taskList}`,
-                blocks: [
-                  {
-                    type: 'section',
-                    text: { type: 'mrkdwn', text: `Moving these to *${targetLabel}*:\n${taskList}` }
-                  },
-                  {
-                    type: 'actions',
-                    elements: [
-                      {
-                        type: 'button',
-                        text: { type: 'plain_text', text: ':white_check_mark: Confirm' },
-                        style: 'primary',
-                        action_id: 'dm_action_confirm',
-                        value: userId
-                      },
-                      {
-                        type: 'button',
-                        text: { type: 'plain_text', text: ':x: Cancel' },
-                        action_id: 'dm_action_cancel',
-                        value: userId
-                      }
-                    ]
-                  }
-                ]
-              });
-              return;
-            }
-
-            if (action.type === 'delete') {
-              dmContext.set(userId, {
-                ...ctx,
-                pendingAction: { ...action, tasks: selectedTasks },
-                timestamp: Date.now()
-              });
-
-              const taskList = selectedTasks.map(t => `• ${t.title}`).join('\n');
-              await say({
-                text: `Delete these?\n${taskList}`,
-                blocks: [
-                  {
-                    type: 'section',
-                    text: { type: 'mrkdwn', text: `:warning: Delete these task(s)?\n${taskList}` }
-                  },
-                  {
-                    type: 'actions',
-                    elements: [
-                      {
-                        type: 'button',
-                        text: { type: 'plain_text', text: ':wastebasket: Yes, delete' },
-                        style: 'danger',
-                        action_id: 'dm_action_confirm',
-                        value: userId
-                      },
-                      {
-                        type: 'button',
-                        text: { type: 'plain_text', text: ':x: Cancel' },
-                        action_id: 'dm_action_cancel',
-                        value: userId
-                      }
-                    ]
-                  }
-                ]
-              });
-              return;
-            }
-          }
-        }
-      }
-
-      await say(UNKNOWN_RESPONSE);
-
     } catch (err) {
       console.error('[DM] Error:', err.message, err.stack);
       await removeThinking();
@@ -1736,6 +1464,118 @@ function registerHandlers(app, supabase, maps) {
         }
       ]
     });
+  });
+
+  // ── THREAD AUTO-ASSIGN — Track (move backlog → active) ──
+  app.action('track_assigned_task', async ({ ack, body, client }) => {
+    await ack();
+    try {
+      const userId = body.user.id;
+      const channelId = body.channel?.id || body.container?.channel_id || userId;
+      const messageTs = body.message?.ts || body.container?.message_ts;
+      const taskId = body.actions?.[0]?.value;
+      if (!taskId) return;
+
+      // Only allow the assignee themselves to track/ignore
+      const { data: task } = await supabase
+        .from('tasks')
+        .select('id, user_id, title, assigned_by, status')
+        .eq('id', taskId)
+        .single();
+
+      if (!task) {
+        await client.chat.update({
+          channel: channelId, ts: messageTs,
+          text: 'This task no longer exists.',
+          blocks: [{ type: 'section', text: { type: 'mrkdwn', text: ':information_source: This task no longer exists.' } }],
+        });
+        return;
+      }
+
+      if (task.user_id !== userId) {
+        await client.chat.postMessage({ channel: channelId, text: "Only the assignee can act on this." });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'active' })
+        .eq('id', taskId);
+
+      if (error) {
+        console.error('[track_assigned_task] update failed:', error.message);
+        return;
+      }
+
+      await client.chat.update({
+        channel: channelId,
+        ts: messageTs,
+        text: `Tracking: ${task.title}`,
+        blocks: [{
+          type: 'section',
+          text: { type: 'mrkdwn', text: `:white_check_mark: *Tracking:* ${task.title}\n_Added to your To Do._` },
+        }],
+      });
+
+      // Refresh home tab for the assignee
+      try {
+        const { data: u } = await supabase.from('users').select('team_id').eq('slack_user_id', userId).limit(1).single();
+        if (u?.team_id) await publishHome(client, userId, u.team_id, supabase, 'my_tasks');
+      } catch {}
+    } catch (err) {
+      console.error('[track_assigned_task] Error:', err.message, err.stack);
+    }
+  });
+
+  // ── THREAD AUTO-ASSIGN — Ignore (delete the task) ──
+  app.action('ignore_assigned_task', async ({ ack, body, client }) => {
+    await ack();
+    try {
+      const userId = body.user.id;
+      const channelId = body.channel?.id || body.container?.channel_id || userId;
+      const messageTs = body.message?.ts || body.container?.message_ts;
+      const taskId = body.actions?.[0]?.value;
+      if (!taskId) return;
+
+      const { data: task } = await supabase
+        .from('tasks')
+        .select('id, user_id, title')
+        .eq('id', taskId)
+        .single();
+
+      if (!task) {
+        await client.chat.update({
+          channel: channelId, ts: messageTs,
+          text: 'This task no longer exists.',
+          blocks: [{ type: 'section', text: { type: 'mrkdwn', text: ':information_source: This task no longer exists.' } }],
+        });
+        return;
+      }
+
+      if (task.user_id !== userId) {
+        await client.chat.postMessage({ channel: channelId, text: "Only the assignee can act on this." });
+        return;
+      }
+
+      await supabase.from('updates').delete().eq('task_id', taskId);
+      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+      if (error) {
+        console.error('[ignore_assigned_task] delete failed:', error.message);
+        return;
+      }
+
+      await client.chat.update({
+        channel: channelId,
+        ts: messageTs,
+        text: `Ignored: ${task.title}`,
+        blocks: [{
+          type: 'section',
+          text: { type: 'mrkdwn', text: `:wastebasket: *Ignored:* ${task.title}\n_Task removed._` },
+        }],
+      });
+    } catch (err) {
+      console.error('[ignore_assigned_task] Error:', err.message, err.stack);
+    }
   });
 
   // ── STANDUP — confirm / go back ──
