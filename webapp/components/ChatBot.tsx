@@ -6,21 +6,11 @@ interface Message {
   id: string
   role: 'user' | 'assistant'
   text: string
-  actions?: {
-    type: 'confirm'
-    action: string
-    taskIds?: string[]
-    targetStatus?: string
-    label: string
-  }[]
 }
 
-interface RecentListItem {
-  index: number
-  id: string
-  title: string
-  status: string
-}
+// Raw history as sent to / received from the server (OpenAI/Groq-compatible shape).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type HistoryMsg = { role: 'user' | 'assistant' | 'tool'; content: string; tool_call_id?: string; tool_calls?: any }
 
 export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => void }) {
   const [open, setOpen] = useState(false)
@@ -28,12 +18,12 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
     {
       id: 'welcome',
       role: 'assistant',
-      text: "👋 Hey! I'm Ping, your task assistant. I can help you create, move, view, or delete tasks. Just tell me what you need!\n\nTry: *\"Show my tasks\"* or *\"Create PRD for payments\"*"
+      text: "👋 Hey! I'm Ping, your task assistant. Talk to me naturally — I can create, move, update, or delete your tasks, or just tell you what's on your plate.\n\nTry: *\"create this task: draft Q1 roadmap\"* or *\"how many tasks in To Do?\"*"
     }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [recentList, setRecentList] = useState<RecentListItem[] | null>(null)
+  const [history, setHistory] = useState<HistoryMsg[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -54,8 +44,8 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
     window.dispatchEvent(new Event('tasks-changed'))
   }, [onTasksChanged])
 
-  const addMessage = (role: 'user' | 'assistant', text: string, actions?: Message['actions']) => {
-    const msg: Message = { id: Date.now().toString() + Math.random(), role, text, actions }
+  const addMessage = (role: 'user' | 'assistant', text: string) => {
+    const msg: Message = { id: Date.now().toString() + Math.random(), role, text }
     setMessages(prev => [...prev, msg])
     return msg
   }
@@ -74,44 +64,17 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          conversationContext: { recentList }
+          history,
         })
       })
 
       const data = await res.json()
 
-      if (data.recentList) {
-        setRecentList(data.recentList)
+      if (Array.isArray(data.history)) {
+        setHistory(data.history)
       }
 
-      // Build actions for confirmation
-      const actions: Message['actions'] = []
-      if (data.needsConfirmation && data.taskIds && data.taskIds.length > 0) {
-        if (data.intent === 'move') {
-          actions.push({
-            type: 'confirm',
-            action: 'move',
-            taskIds: data.taskIds,
-            targetStatus: data.targetStatus,
-            label: '✅ Confirm'
-          })
-        }
-        if (data.intent === 'delete') {
-          actions.push({
-            type: 'confirm',
-            action: 'delete',
-            taskIds: data.taskIds,
-            label: '🗑️ Yes, delete'
-          })
-        }
-        actions.push({
-          type: 'confirm',
-          action: 'cancel',
-          label: '❌ Cancel'
-        })
-      }
-
-      addMessage('assistant', data.reply || "I didn't understand that.", actions.length > 0 ? actions : undefined)
+      addMessage('assistant', data.reply || "…")
 
       if (data.executed) {
         refreshDashboard()
@@ -119,43 +82,6 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
 
     } catch {
       addMessage('assistant', "Sorry, something went wrong. Please try again.")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleAction = async (action: NonNullable<Message['actions']>[0]) => {
-    if (action.action === 'cancel') {
-      addMessage('assistant', 'Cancelled. ✌️')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: action.action,
-          taskIds: action.taskIds,
-          targetStatus: action.targetStatus,
-        })
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        const count = data.moved || data.deleted || 0
-        if (action.action === 'move') {
-          addMessage('assistant', `✅ Done! Moved ${count} task(s).`)
-        } else if (action.action === 'delete') {
-          addMessage('assistant', `🗑️ Deleted ${count} task(s).`)
-        }
-        refreshDashboard()
-      } else {
-        addMessage('assistant', "Something went wrong. Please try again.")
-      }
-    } catch {
-      addMessage('assistant', "Sorry, something went wrong.")
     } finally {
       setLoading(false)
     }
@@ -304,45 +230,6 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
                 }}>
                   {renderText(msg.text)}
                 </div>
-
-                {/* Action buttons */}
-                {msg.actions && msg.actions.length > 0 && (
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {msg.actions.map((action, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleAction(action)}
-                        disabled={loading}
-                        style={{
-                          padding: '6px 14px',
-                          borderRadius: '8px',
-                          cursor: loading ? 'wait' : 'pointer',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          fontFamily: 'inherit',
-                          background: action.action === 'cancel'
-                            ? 'var(--surface3, #1e1e32)'
-                            : action.action === 'delete'
-                              ? 'rgba(248,113,113,0.15)'
-                              : 'rgba(124,92,252,0.15)',
-                          color: action.action === 'cancel'
-                            ? 'var(--muted, #888)'
-                            : action.action === 'delete'
-                              ? '#f87171'
-                              : 'var(--accent, #7c5cfc)',
-                          border: `1px solid ${action.action === 'cancel'
-                            ? 'var(--border, rgba(255,255,255,0.07))'
-                            : action.action === 'delete'
-                              ? 'rgba(248,113,113,0.25)'
-                              : 'rgba(124,92,252,0.25)'}`,
-                          opacity: loading ? 0.5 : 1,
-                        }}
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             ))}
 
