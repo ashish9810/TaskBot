@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 const TEAMS = [
   'Product',
@@ -27,6 +28,7 @@ function initialsOf(name: string, email: string): string {
 }
 
 export default function ProfilePanel({ open, onClose, name, email, team }: Props) {
+  const router = useRouter()
   const [currentTeam, setCurrentTeam] = useState<string | null>(team ?? null)
   const [saving, setSaving] = useState(false)
   const [savedTick, setSavedTick] = useState(0)
@@ -62,6 +64,9 @@ export default function ProfilePanel({ open, onClose, name, email, team }: Props
         setCurrentTeam(team ?? null)
       } else {
         setSavedTick(t => t + 1)
+        // Refresh server-rendered data so the dashboard reflects the new team
+        // without a hard reload.
+        router.refresh()
       }
     } catch {
       setCurrentTeam(team ?? null)
@@ -172,19 +177,33 @@ export default function ProfilePanel({ open, onClose, name, email, team }: Props
               <label htmlFor="team-select" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                 Team
               </label>
-              {savedTick > 0 && (
+              {saving ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--muted)' }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '11px',
+                      height: '11px',
+                      border: '2px solid var(--border2)',
+                      borderTopColor: 'var(--accent-light)',
+                      borderRadius: '50%',
+                      animation: 'spin 0.7s linear infinite',
+                    }}
+                  />
+                  Saving…
+                </span>
+              ) : savedTick > 0 ? (
                 <span
                   key={savedTick}
                   style={{
                     fontSize: '11px',
                     color: 'var(--accent-light)',
                     animation: 'confirmFlash 1.2s ease',
-                    opacity: saving ? 0.5 : 1,
                   }}
                 >
                   ✓ Saved
                 </span>
-              )}
+              ) : null}
             </div>
             <select
               id="team-select"

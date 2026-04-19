@@ -53,14 +53,6 @@ export default async function AllTasksPage() {
     taskRows = data || []
   }
 
-  // Slack users in this workspace (name resolution for users without a web profile)
-  const { data: slackUsers } = workspace.slack_team_id
-    ? await admin
-        .from('users')
-        .select('slack_user_id, name, email')
-        .eq('team_id', workspace.slack_team_id)
-    : { data: [] as Array<{ slack_user_id: string; name: string; email: string | null }> }
-
   // profile_slack_links — lets us map tasks.user_id (slack_user_id) → profile.team
   const { data: links } = workspace.slack_team_id
     ? await admin
@@ -78,58 +70,51 @@ export default async function AllTasksPage() {
     if (p) profileById.set(p.id, p)
   }
 
-  // Build people list keyed by user_id (the key stored on tasks)
-  // - For web-native tasks, user_id === profiles.id
-  // - For Slack tasks, user_id === slack_user_id; we look up linked profile to pull team
-  const peopleByUserId = new Map<string, ManagerPerson>()
+  // Only users who have signed up on the web are surfaced. Every task.user_id gets
+  // normalized to a canonical profile uuid:
+  //   (a) user_id === profiles.id  → direct match
+  //   (b) user_id === slack_user_id with a row in profile_slack_links → resolve to profile_id
+  //   (c) anything else (Slack-only user)  → task is dropped.
+  const profileIdBySlackUserId = new Map<string, string>()
+  for (const l of links || []) {
+    if (profileById.has(l.profile_id)) profileIdBySlackUserId.set(l.slack_user_id, l.profile_id)
+  }
 
-  // 1) Web profiles → keyed by their uuid
-  for (const p of profileById.values()) {
-    peopleByUserId.set(p.id, {
+  function canonicalProfileId(rawUserId: string): string | null {
+    if (!rawUserId) return null
+    if (profileById.has(rawUserId)) return rawUserId
+    const viaSlack = profileIdBySlackUserId.get(rawUserId)
+    if (viaSlack) return viaSlack
+    return null
+  }
+
+  // Rewrite tasks.user_id → profile uuid; drop tasks for Slack-only users.
+  const tasks: ManagerTask[] = []
+  for (const r of taskRows) {
+    const canonical = canonicalProfileId(String(r.user_id || ''))
+    if (!canonical) continue
+    tasks.push({
+      id: String(r.id),
+      title: String(r.title || ''),
+      status: String(r.status || 'active'),
+      priority: (r.priority as string) || null,
+      due_date: (r.due_date as string) || null,
+      user_id: canonical,
+      status_changed_at: (r.status_changed_at as string) || null,
+      created_at: (r.created_at as string) || null,
+    })
+  }
+
+  // Build the people list from signed-up profiles that actually have tasks.
+  const usersWithTasks = new Set(tasks.map(t => t.user_id))
+  const people: ManagerPerson[] = Array.from(profileById.values())
+    .filter(p => usersWithTasks.has(p.id))
+    .map(p => ({
       user_id: p.id,
       name: p.name || p.email || 'Unknown',
       email: p.email || '',
       team: p.team || null,
-    })
-  }
-
-  // 2) Slack users → keyed by slack_user_id. If linked to a profile, pull team.
-  const profileBySlackId = new Map<string, ProfileRow>()
-  for (const l of links || []) {
-    const prof = profileById.get(l.profile_id)
-    if (prof) profileBySlackId.set(l.slack_user_id, prof)
-  }
-
-  for (const u of (slackUsers || []) as Array<{ slack_user_id: string; name: string; email: string | null }>) {
-    const linkedProfile = profileBySlackId.get(u.slack_user_id)
-    peopleByUserId.set(u.slack_user_id, {
-      user_id: u.slack_user_id,
-      name: linkedProfile?.name || u.name || u.slack_user_id,
-      email: linkedProfile?.email || u.email || '',
-      team: linkedProfile?.team || null,
-    })
-  }
-
-  // 3) Fallback — any task user_id we haven't covered yet gets a placeholder
-  for (const t of taskRows) {
-    const uid = String(t.user_id || '')
-    if (uid && !peopleByUserId.has(uid)) {
-      peopleByUserId.set(uid, { user_id: uid, name: uid, email: '', team: null })
-    }
-  }
-
-  const tasks: ManagerTask[] = taskRows.map(r => ({
-    id: String(r.id),
-    title: String(r.title || ''),
-    status: String(r.status || 'active'),
-    priority: (r.priority as string) || null,
-    due_date: (r.due_date as string) || null,
-    user_id: String(r.user_id || ''),
-    status_changed_at: (r.status_changed_at as string) || null,
-    created_at: (r.created_at as string) || null,
-  }))
-
-  const people: ManagerPerson[] = Array.from(peopleByUserId.values())
+    }))
 
   return <ManagerDashboard tasks={tasks} people={people} />
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 export interface ManagerTask {
   id: string
@@ -34,8 +34,7 @@ const STATUS_META: Record<string, { label: string; bg: string; fg: string; dot: 
   completed:   { label: 'Done',        bg: 'rgba(74,222,128,0.14)',  fg: '#4ade80', dot: '#22c55e' },
 }
 
-const STATUS_FILTERS: Array<{ value: string; label: string }> = [
-  { value: 'all', label: 'All' },
+const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'active', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'completed', label: 'Done' },
@@ -67,9 +66,10 @@ function initialsOf(name: string): string {
 }
 
 export default function ManagerDashboard({ tasks, people }: Props) {
-  const [team, setTeam] = useState<string>('all')
-  const [person, setPerson] = useState<string>('all')
-  const [status, setStatus] = useState<string>('all')
+  // Empty set = no filter (show all). Non-empty = show only selected values.
+  const [teamFilter, setTeamFilter] = useState<Set<string>>(new Set())
+  const [personFilter, setPersonFilter] = useState<Set<string>>(new Set())
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set())
   const [sort, setSort] = useState<'pending' | 'priority' | 'due'>('pending')
   const [search, setSearch] = useState<string>('')
 
@@ -108,12 +108,12 @@ export default function ManagerDashboard({ tasks, people }: Props) {
     const q = search.trim().toLowerCase()
     const list = tasks.filter(t => {
       const p = personByUserId.get(t.user_id)
-      if (team !== 'all') {
-        const pt = p?.team || null
-        if (pt !== team) return false
+      if (teamFilter.size > 0) {
+        const pt = p?.team || ''
+        if (!teamFilter.has(pt)) return false
       }
-      if (person !== 'all' && t.user_id !== person) return false
-      if (status !== 'all' && t.status !== status) return false
+      if (personFilter.size > 0 && !personFilter.has(t.user_id)) return false
+      if (statusFilter.size > 0 && !statusFilter.has(t.status)) return false
       if (q) {
         const haystack = `${t.title} ${p?.name || ''}`.toLowerCase()
         if (!haystack.includes(q)) return false
@@ -147,11 +147,11 @@ export default function ManagerDashboard({ tasks, people }: Props) {
       })
     }
     return sorted
-  }, [tasks, personByUserId, team, person, status, sort, search, now])
+  }, [tasks, personByUserId, teamFilter, personFilter, statusFilter, sort, search, now])
 
-  const hasFilter = team !== 'all' || person !== 'all' || status !== 'all' || sort !== 'pending' || search.trim().length > 0
+  const hasFilter = teamFilter.size > 0 || personFilter.size > 0 || statusFilter.size > 0 || sort !== 'pending' || search.trim().length > 0
   function clearFilters() {
-    setTeam('all'); setPerson('all'); setStatus('all'); setSort('pending'); setSearch('')
+    setTeamFilter(new Set()); setPersonFilter(new Set()); setStatusFilter(new Set()); setSort('pending'); setSearch('')
   }
 
   const sortedPeople = useMemo(() => people.slice().sort((a, b) => a.name.localeCompare(b.name)), [people])
@@ -176,17 +176,27 @@ export default function ManagerDashboard({ tasks, people }: Props) {
 
       {/* Filter bar */}
       <div style={styles.filterBar}>
-        <Select label="Team" value={team} onChange={setTeam}>
-          <option value="all">All teams</option>
-          {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
-        </Select>
-        <Select label="Person" value={person} onChange={setPerson}>
-          <option value="all">All people</option>
-          {sortedPeople.map(p => <option key={p.user_id} value={p.user_id}>{p.name}</option>)}
-        </Select>
-        <Select label="Status" value={status} onChange={setStatus}>
-          {STATUS_FILTERS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </Select>
+        <MultiSelect
+          label="Team"
+          placeholder="All teams"
+          options={TEAMS.map(t => ({ value: t, label: t }))}
+          selected={teamFilter}
+          onChange={setTeamFilter}
+        />
+        <MultiSelect
+          label="Person"
+          placeholder="All people"
+          options={sortedPeople.map(p => ({ value: p.user_id, label: p.name }))}
+          selected={personFilter}
+          onChange={setPersonFilter}
+        />
+        <MultiSelect
+          label="Status"
+          placeholder="All statuses"
+          options={STATUS_OPTIONS}
+          selected={statusFilter}
+          onChange={setStatusFilter}
+        />
         <Select label="Sort" value={sort} onChange={(v) => setSort(v as 'pending' | 'priority' | 'due')}>
           <option value="pending">Pending since</option>
           <option value="priority">Priority</option>
@@ -277,6 +287,123 @@ export default function ManagerDashboard({ tasks, people }: Props) {
 }
 
 // ─── sub-components ─────────────────────────────────────────────────────────
+
+function MultiSelect({
+  label,
+  placeholder,
+  options,
+  selected,
+  onChange,
+}: {
+  label: string
+  placeholder: string
+  options: Array<{ value: string; label: string }>
+  selected: Set<string>
+  onChange: (next: Set<string>) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const anchorRef = useRef<HTMLDivElement>(null)
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    function onDown(e: MouseEvent) {
+      if (!anchorRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  function toggle(value: string) {
+    const next = new Set(selected)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    onChange(next)
+  }
+
+  function selectAll() { onChange(new Set(options.map(o => o.value))) }
+  function clearAll() { onChange(new Set()) }
+
+  const labelText = selected.size === 0
+    ? placeholder
+    : selected.size === 1
+      ? options.find(o => selected.has(o.value))?.label || placeholder
+      : `${selected.size} selected`
+
+  return (
+    <div ref={anchorRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '160px' }}>
+      <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        style={{
+          ...styles.select,
+          textAlign: 'left',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+          color: selected.size === 0 ? 'var(--muted)' : 'var(--text)',
+          minWidth: '160px',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{labelText}</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" style={{ flexShrink: 0, opacity: 0.6, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div style={styles.dropdownPanel}>
+          <div style={{ display: 'flex', gap: '10px', padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>
+            <button type="button" onClick={selectAll} style={styles.dropdownActionBtn}>Select all</button>
+            <button type="button" onClick={clearAll} style={styles.dropdownActionBtn}>Clear</button>
+          </div>
+          <div style={{ maxHeight: '260px', overflowY: 'auto', padding: '4px 0' }}>
+            {options.length === 0 ? (
+              <div style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--muted)' }}>No options</div>
+            ) : (
+              options.map(opt => {
+                const checked = selected.has(opt.value)
+                return (
+                  <label
+                    key={opt.value}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      color: 'var(--text)',
+                      userSelect: 'none',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggle(opt.value)}
+                      style={{ width: '15px', height: '15px', accentColor: 'var(--accent)', cursor: 'pointer' }}
+                    />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
+                  </label>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function SummaryCard({ label, value, tone }: { label: string; value: number; tone: 'neutral' | 'progress' | 'done' | 'warn' }) {
   const toneStyles: Record<typeof tone, { border: string; glow: string; fg: string }> = {
@@ -416,6 +543,31 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'inherit',
     alignSelf: 'stretch',
     marginTop: 'auto',
+  },
+  dropdownPanel: {
+    position: 'absolute',
+    top: 'calc(100% + 4px)',
+    left: 0,
+    right: 0,
+    minWidth: '200px',
+    background: 'var(--surface)',
+    border: '1px solid var(--border2)',
+    borderRadius: '10px',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+    zIndex: 20,
+    animation: 'popIn 0.15s ease',
+  },
+  dropdownActionBtn: {
+    background: 'transparent',
+    border: 'none',
+    padding: '4px 6px',
+    fontSize: '11px',
+    fontWeight: 600,
+    color: 'var(--accent-light)',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
   },
   table: {
     width: '100%',

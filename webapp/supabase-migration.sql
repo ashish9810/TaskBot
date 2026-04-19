@@ -278,7 +278,26 @@ CREATE POLICY "Users can read teammates in their workspace"
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS team text DEFAULT NULL;
 
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS status_changed_at timestamptz DEFAULT now();
+-- Add column without a DEFAULT first so the backfill below catches every existing row.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS status_changed_at timestamptz;
+
+-- Backfill: use completed_at for completed tasks, else created_at.
 UPDATE tasks
   SET status_changed_at = COALESCE(completed_at, created_at)
   WHERE status_changed_at IS NULL;
+
+-- Future inserts should default to now() when no value is provided.
+ALTER TABLE tasks ALTER COLUMN status_changed_at SET DEFAULT now();
+
+-- NOTE: if you already ran an earlier version of this migration that used
+--   ALTER TABLE ... DEFAULT now() BEFORE the backfill, every existing task got
+--   stamped at the migration time (causing "0d pending" for everything). Run this
+--   one-off repair to restore correct values:
+--
+--   UPDATE tasks
+--     SET status_changed_at = COALESCE(completed_at, created_at)
+--     WHERE status_changed_at > created_at + interval '1 minute'
+--       AND (
+--         completed_at IS NULL
+--         OR status_changed_at > completed_at + interval '1 minute'
+--       );
