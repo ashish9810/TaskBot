@@ -716,8 +716,11 @@ function registerHandlers(app, supabase, maps) {
 
     const rawText = event.text;
     const text = rawText.replace(/<@[A-Z0-9]+>/g, '').trim();
+    const isThreaded = !!event.thread_ts;
 
-    if (!text) {
+    // Empty mention outside a thread → show help.
+    // Empty mention inside a thread → fall through and auto-extract tasks.
+    if (!text && !isThreaded) {
       await client.chat.postMessage({
         channel: event.channel,
         thread_ts: event.ts,
@@ -727,14 +730,10 @@ function registerHandlers(app, supabase, maps) {
     }
 
     // ── THREAD TASK EXTRACTION ──
-    // Detect if the mention is inside a thread and asking for task extraction
-    const THREAD_TASK_PATTERNS = [
-      /\b(assign|create|extract|find|identify|list|get|pull)\b.*\b(task|tasks|action items?|todos?|to-dos?)\b/i,
-      /\b(task|tasks|action items?|todos?|to-dos?)\b.*\b(from this|from the|in this)\b.*\b(thread|conversation|chat|discussion)\b/i,
-      /\bwhat.*\b(task|tasks|action items?|todos?)\b/i,
-    ];
-    const isThreaded = !!event.thread_ts;
-    const isThreadTaskRequest = isThreaded && THREAD_TASK_PATTERNS.some(p => p.test(text));
+    // Any @Ping mention inside a thread is treated as "read this thread and
+    // create tasks" — this matches user expectation (just tag the bot, no
+    // keywords needed).
+    const isThreadTaskRequest = isThreaded;
 
     if (isThreadTaskRequest) {
       try {
