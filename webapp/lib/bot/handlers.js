@@ -839,21 +839,42 @@ function registerHandlers(app, supabase, maps) {
           return;
         }
 
-        // ── AUTO-CREATE TASKS (no checkbox confirmation) ──
-        // Self-assigned → status 'active' (To Do).
-        // Assigned to someone else → status 'backlog' + DM the assignee with Track/Ignore buttons.
+        // ── AUTO-CREATE TASKS (confidence-based assignee routing) ──
+        // high confidence → route to the named assignee (self → To Do, other → Inbox + DM).
+        // medium confidence → same routing, but the DM is flagged "auto-assigned, please confirm".
+        // low confidence OR null assignee → drop in the REQUESTER's Inbox (never guess onto a teammate).
         const workspaceId = await getWorkspaceId(teamId, supabase);
         const webUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-        let createdSelf = 0;
-        const createdForOthers = []; // { taskId, title, assigneeId, assigneeName }
+        // Per-task outcome rows, so the thread summary can show each task with its source quote.
+        const created = []; // { title, source_quote, assigneeId, assigneeName, confidence, routedAs: 'self' | 'other' | 'inbox' }
         const createFailures = [];
 
         for (const t of tasks) {
+          const conf = t.assignee_confidence || 'low';
           const rawAssignee = t.assignee_slack_id || null;
-          const isSelf = !rawAssignee || rawAssignee === event.user;
-          const assigneeId = isSelf ? event.user : rawAssignee;
-          const status = isSelf ? 'active' : 'backlog';
+
+          // Decide routing.
+          let assigneeId;          // who owns the row in the DB
+          let status;              // 'active' | 'backlog'
+          let routedAs;            // 'self' | 'other' | 'inbox'
+          let ambiguousFallback = false;
+
+          if (conf === 'low' || !rawAssignee) {
+            // Don't guess — park it in the requester's Inbox.
+            assigneeId = event.user;
+            status = 'backlog';
+            routedAs = 'inbox';
+            ambiguousFallback = true;
+          } else if (rawAssignee === event.user) {
+            assigneeId = event.user;
+            status = 'active';
+            routedAs = 'self';
+          } else {
+            assigneeId = rawAssignee;
+            status = 'backlog';
+            routedAs = 'other';
+          }
 
           const insert = {
             title: t.title,
@@ -876,95 +897,146 @@ function registerHandlers(app, supabase, maps) {
             continue;
           }
 
-          if (isSelf) {
-            createdSelf++;
-          } else {
-            createdForOthers.push({
-              taskId: inserted.id,
-              title: inserted.title,
-              assigneeId,
-              assigneeName: userMap.get(assigneeId) || 'teammate',
-            });
-          }
+          created.push({
+            taskId: inserted.id,
+            title: inserted.title,
+            source_quote: t.source_quote || null,
+            due_hint: t.due_hint || null,
+            confidence: conf,
+            ambiguousFallback,
+            assigneeId,
+            assigneeName: userMap.get(assigneeId) || 'teammate',
+            routedAs,
+          });
         }
 
-        // DM each external assignee with Track / Ignore buttons
-        for (const assigned of createdForOthers) {
+        // DM each external assignee (routedAs === 'other') with Track / Ignore buttons.
+        // For medium confidence, append a note that the bot auto-inferred the assignee.
+        for (const c of created) {
+          if (c.routedAs !== 'other') continue;
+          const mediumNote = c.confidence === 'medium' ? '  _(auto-assigned — please confirm)_' : '';
+          const quoteLine = c.source_quote
+            ? `:speech_balloon: _From the thread:_ _"${c.source_quote}"_`
+            : null;
+          const sectionBlocks = [{
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `:wave: Hey! <@${event.user}> assigned you a task from a thread:\n*${c.title}*${mediumNote}`,
+            },
+          }];
+          if (quoteLine) {
+            sectionBlocks.push({
+              type: 'context',
+              elements: [{ type: 'mrkdwn', text: quoteLine }],
+            });
+          }
+          sectionBlocks.push({
+            type: 'context',
+            elements: [{
+              type: 'mrkdwn',
+              text: `_From <#${event.channel}>_ · <${webUrl}/dashboard|Open dashboard>`,
+            }],
+          });
+          sectionBlocks.push({
+            type: 'actions',
+            elements: [
+              {
+                type: 'button',
+                text: { type: 'plain_text', text: ':white_check_mark: Track' },
+                style: 'primary',
+                action_id: 'track_assigned_task',
+                value: c.taskId,
+              },
+              {
+                type: 'button',
+                text: { type: 'plain_text', text: ':x: Ignore' },
+                action_id: 'ignore_assigned_task',
+                value: c.taskId,
+              },
+            ],
+          });
+
           try {
             await client.chat.postMessage({
-              channel: assigned.assigneeId,
-              text: `:wave: <@${event.user}> assigned you a task from a thread: ${assigned.title}`,
-              blocks: [
-                {
-                  type: 'section',
-                  text: {
-                    type: 'mrkdwn',
-                    text: `:wave: Hey! <@${event.user}> assigned you a task from a thread:\n*${assigned.title}*`,
-                  },
-                },
-                {
-                  type: 'context',
-                  elements: [{
-                    type: 'mrkdwn',
-                    text: `_From <#${event.channel}>_ · <${webUrl}/dashboard|Open dashboard>`,
-                  }],
-                },
-                {
-                  type: 'actions',
-                  elements: [
-                    {
-                      type: 'button',
-                      text: { type: 'plain_text', text: ':white_check_mark: Track' },
-                      style: 'primary',
-                      action_id: 'track_assigned_task',
-                      value: assigned.taskId,
-                    },
-                    {
-                      type: 'button',
-                      text: { type: 'plain_text', text: ':x: Ignore' },
-                      action_id: 'ignore_assigned_task',
-                      value: assigned.taskId,
-                    },
-                  ],
-                },
-              ],
+              channel: c.assigneeId,
+              text: `:wave: <@${event.user}> assigned you a task from a thread: ${c.title}`,
+              blocks: sectionBlocks,
             });
           } catch (e) {
             console.error('[thread_auto_create] DM to assignee failed (non-fatal):', e.message);
           }
         }
 
-        // Thread summary reply
+        // ── Thread summary reply (per-task detail with source quotes) ──
         const summaryLines = [];
-        if (result.summary) summaryLines.push(`:mag: *Thread summary:* ${result.summary}`);
-        summaryLines.push('');
-        const totalCreated = createdSelf + createdForOthers.length;
-        summaryLines.push(`:white_check_mark: Created *${totalCreated} task(s)* from this thread:`);
-        if (createdSelf > 0) {
-          summaryLines.push(`• *${createdSelf}* added to your To Do (<@${event.user}>).`);
+        if (result.thread_topic) {
+          summaryLines.push(`:mag: *Topic:* ${result.thread_topic}`);
         }
-        if (createdForOthers.length > 0) {
-          const grouped = {};
-          for (const t of createdForOthers) {
-            grouped[t.assigneeId] = grouped[t.assigneeId] || [];
-            grouped[t.assigneeId].push(t.title);
+        if (result.summary) {
+          summaryLines.push(`_${result.summary}_`);
+        }
+        if (summaryLines.length > 0) summaryLines.push('');
+
+        const totalCreated = created.length;
+        summaryLines.push(`:white_check_mark: *Created ${totalCreated} task(s)* from this thread:`);
+
+        const ambiguousCount = created.filter(c => c.ambiguousFallback).length;
+
+        for (const c of created) {
+          let assigneeText;
+          if (c.routedAs === 'self') {
+            assigneeText = `→ <@${c.assigneeId}>  (in your To Do)`;
+          } else if (c.routedAs === 'other') {
+            const confTag = c.confidence === 'medium' ? ' _(medium confidence)_' : '';
+            assigneeText = `→ <@${c.assigneeId}>  (awaiting Track/Ignore)${confTag}`;
+          } else {
+            assigneeText = `→ *unassigned* (parked in <@${event.user}>'s Inbox)`;
           }
-          for (const [aid, titles] of Object.entries(grouped)) {
-            summaryLines.push(`• *${titles.length}* sent to <@${aid}> (awaiting Track/Ignore).`);
+          summaryLines.push(`• *${c.title}*  ${assigneeText}`);
+          if (c.source_quote) {
+            summaryLines.push(`    _"${c.source_quote}"_`);
           }
+        }
+
+        if (ambiguousCount > 0) {
+          summaryLines.push('');
+          summaryLines.push(`:information_source: *${ambiguousCount} task(s)* I couldn't confidently assign — check your Inbox to review and reassign.`);
         }
         if (createFailures.length > 0) {
           summaryLines.push(`:warning: Couldn't create ${createFailures.length} task(s): ${createFailures.map(t => `"${t}"`).join(', ')}`);
+        }
+
+        // createdSelf is used below to decide whether to refresh the requester's home tab.
+        const createdSelf = created.filter(c => c.routedAs === 'self' || c.routedAs === 'inbox').length;
+
+        // Slack section text is capped at ~3000 chars; with source quotes the summary
+        // can get long, so split into chunks when needed.
+        const joined = summaryLines.join('\n');
+        const SECTION_MAX = 2800;
+        const chunks = [];
+        if (joined.length <= SECTION_MAX) {
+          chunks.push(joined);
+        } else {
+          let buf = '';
+          for (const line of summaryLines) {
+            if (buf.length + line.length + 1 > SECTION_MAX) {
+              chunks.push(buf);
+              buf = '';
+            }
+            buf += (buf ? '\n' : '') + line;
+          }
+          if (buf) chunks.push(buf);
         }
 
         await client.chat.postMessage({
           channel: event.channel,
           thread_ts: event.thread_ts,
           text: `Created ${totalCreated} task(s) from this thread.`,
-          blocks: [{
+          blocks: chunks.map(c => ({
             type: 'section',
-            text: { type: 'mrkdwn', text: summaryLines.join('\n') },
-          }],
+            text: { type: 'mrkdwn', text: c },
+          })),
         });
 
         // Refresh requester's home tab if any task was self-assigned
