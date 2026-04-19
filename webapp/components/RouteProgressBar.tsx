@@ -75,8 +75,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   bar: {
     height: '100%',
-    background: 'linear-gradient(90deg, #7c5cfc, #9d82fd)',
-    boxShadow: '0 0 10px rgba(124, 92, 252, 0.5)',
+    background: 'linear-gradient(90deg, #E06C4D, #EF8265)',
+    boxShadow: '0 0 10px rgba(224, 108, 77, 0.45)',
     borderRadius: '0 2px 2px 0',
     transition: 'width 0.3s ease, opacity 0.2s ease',
   },

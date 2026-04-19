@@ -91,7 +91,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '48px',
     height: '48px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)',
+    background: 'linear-gradient(135deg, #E06C4D, #F0926E)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

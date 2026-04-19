@@ -36,34 +36,34 @@ const COLUMNS = [
   {
     id: 'backlog',
     label: 'Inbox',
-    color: '#f59e0b',
-    accent: '#d97706',
-    glow: 'rgba(217,119,6,0.15)',
-    bar: 'linear-gradient(90deg, #b45309, #f59e0b)',
+    color: '#B45309',
+    accent: '#92400E',
+    glow: 'rgba(180,83,9,0.10)',
+    bar: 'linear-gradient(90deg, #92400E, #D97706)',
   },
   {
     id: 'active',
     label: 'To Do',
-    color: '#94a3b8',
-    accent: '#475569',
-    glow: 'rgba(100,116,139,0.15)',
-    bar: 'linear-gradient(90deg, #64748b, #94a3b8)',
+    color: '#57534E',
+    accent: '#44403A',
+    glow: 'rgba(87,83,78,0.10)',
+    bar: 'linear-gradient(90deg, #44403A, #78716C)',
   },
   {
     id: 'in_progress',
     label: 'In Progress',
-    color: '#60a5fa',
-    accent: '#3b82f6',
-    glow: 'rgba(59,130,246,0.15)',
-    bar: 'linear-gradient(90deg, #2563eb, #60a5fa)',
+    color: '#3B5BDB',
+    accent: '#2A3EB1',
+    glow: 'rgba(59,91,219,0.10)',
+    bar: 'linear-gradient(90deg, #2A3EB1, #5E72E4)',
   },
   {
     id: 'completed',
     label: 'Done',
-    color: '#4ade80',
-    accent: '#22c55e',
-    glow: 'rgba(34,197,94,0.15)',
-    bar: 'linear-gradient(90deg, #16a34a, #4ade80)',
+    color: '#059669',
+    accent: '#047857',
+    glow: 'rgba(5,150,105,0.10)',
+    bar: 'linear-gradient(90deg, #047857, #10B981)',
   },
 ]
 
@@ -289,8 +289,8 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
       {showSlackToast && (
         <div style={s.toast}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-            <circle cx="8" cy="8" r="7" fill="#22c55e" opacity="0.15"/>
-            <path d="M5 8.5L7 10.5L11 5.5" stroke="#4ade80" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="8" cy="8" r="7" fill="#10B981" opacity="0.15"/>
+            <path d="M5 8.5L7 10.5L11 5.5" stroke="#059669" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Slack connected successfully! Your team members will sync automatically.
           <button onClick={() => setShowSlackToast(false)} style={s.toastClose}>
@@ -324,7 +324,7 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
               key={col.id}
               style={{
                 ...s.column,
-                ...(isOver ? { ...s.columnOver, boxShadow: `0 0 0 2px ${col.accent}55, 0 8px 32px rgba(0,0,0,0.4)` } : {}),
+                ...(isOver ? { ...s.columnOver, boxShadow: `0 0 0 2px ${col.accent}55, var(--shadow-elevated)` } : {}),
               }}
               onDragOver={e => { e.preventDefault(); setDragOver(col.id) }}
               onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(null) }}
@@ -451,10 +451,10 @@ function QuickAddCard({ onAdd, onCancel, accentColor }: { onAdd: (t: string) => 
 }
 
 const priorityColors: Record<string, { color: string; bg: string }> = {
-  low: { color: '#4ade80', bg: 'rgba(74,222,128,0.12)' },
-  medium: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-  high: { color: '#f97316', bg: 'rgba(249,115,22,0.12)' },
-  urgent: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+  low: { color: '#059669', bg: 'rgba(5,150,105,0.10)' },
+  medium: { color: '#B45309', bg: 'rgba(180,83,9,0.10)' },
+  high: { color: '#C2410C', bg: 'rgba(194,65,12,0.10)' },
+  urgent: { color: '#B91C1C', bg: 'rgba(185,28,28,0.10)' },
 }
 
 // ─── Kanban Card ─────────────────────────────────────────────────────────────
@@ -468,7 +468,7 @@ function PriorityIcon({ priority, onClick }: { priority: string; onClick: (e: Re
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ pointerEvents: 'none' }}>
         {[0,1,2,3].map(i => (
           <rect key={i} x={1 + i * 3.5} y={10 - (i + 1) * 2.2} width="2.5" height={(i + 1) * 2.2}
-            rx="0.5" fill={i < bars ? color : 'rgba(255,255,255,0.08)'} />
+            rx="0.5" fill={i < bars ? color : 'rgba(31,29,24,0.12)'} />
         ))}
       </svg>
     </button>
@@ -488,7 +488,7 @@ function PriorityDropdown({ current, onSelect, anchorRef }: { current: string; o
     bottom: rect ? window.innerHeight - rect.top + 6 : 0,
     background: 'var(--surface)', border: '1px solid var(--border2)',
     borderRadius: '10px', padding: '4px', minWidth: '160px',
-    boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+    boxShadow: 'var(--shadow-modal)',
   }
 
   return (
@@ -506,7 +506,7 @@ function PriorityDropdown({ current, onSelect, anchorRef }: { current: string; o
             <svg width="12" height="12" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
               {[0,1,2,3].map(i => (
                 <rect key={i} x={1 + i * 3.5} y={10 - (i + 1) * 2.2} width="2.5" height={(i + 1) * 2.2}
-                  rx="0.5" fill={i < bars ? pColor : 'rgba(255,255,255,0.08)'} />
+                  rx="0.5" fill={i < bars ? pColor : 'rgba(31,29,24,0.12)'} />
               ))}
             </svg>
             <span style={{ color: isActive ? pColor : undefined }}>{labels[p]}</span>
@@ -674,14 +674,14 @@ const s: Record<string, React.CSSProperties> = {
 
   toast: {
     display: 'flex', alignItems: 'center', gap: '10px',
-    background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)',
+    background: 'rgba(5,150,105,0.08)', border: '1px solid rgba(5,150,105,0.25)',
     borderRadius: '10px', padding: '12px 16px',
-    fontSize: '13px', fontWeight: 500, color: '#4ade80',
+    fontSize: '13px', fontWeight: 500, color: '#047857',
     marginBottom: '16px', animation: 'fadeSlideIn 0.3s ease',
   },
   toastClose: {
     marginLeft: 'auto', background: 'none', border: 'none',
-    color: 'rgba(74,222,128,0.5)', cursor: 'pointer', padding: '2px',
+    color: 'rgba(5,150,105,0.5)', cursor: 'pointer', padding: '2px',
     display: 'flex', flexShrink: 0,
   },
 
@@ -689,12 +689,12 @@ const s: Record<string, React.CSSProperties> = {
   headerLeft: { display: 'flex', alignItems: 'center', gap: '12px' },
   heading: { fontSize: '22px', fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text)' },
   workspaceBadge: {
-    background: 'rgba(124,92,252,0.12)',
-    border: '1px solid rgba(124,92,252,0.25)',
+    background: 'var(--accent-glow)',
+    border: '1px solid rgba(224,108,77,0.28)',
     borderRadius: '100px',
     padding: '3px 12px',
     fontSize: '12px',
-    color: 'var(--accent-light)',
+    color: 'var(--accent)',
     fontWeight: 500,
   },
   activeCount: {
@@ -703,7 +703,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   activeDot: {
     width: '6px', height: '6px', borderRadius: '50%',
-    background: '#4ade80', boxShadow: '0 0 6px #4ade80',
+    background: '#10B981', boxShadow: '0 0 6px rgba(16,185,129,0.6)',
   },
 
   board: {
@@ -730,7 +730,7 @@ const s: Record<string, React.CSSProperties> = {
     borderColor: 'var(--border)',
     transition: 'border-color 0.2s, box-shadow 0.2s',
   },
-  columnOver: { borderColor: 'rgba(124,92,252,0.5)' },
+  columnOver: { borderColor: 'rgba(224,108,77,0.55)' },
 
   colBar: { height: '3px', width: '100%', flexShrink: 0 },
 
@@ -749,10 +749,11 @@ const s: Record<string, React.CSSProperties> = {
     padding: '1px 8px',
   },
   addBtn: {
-    background: 'rgba(255,255,255,0.05)',
+    background: 'var(--surface2)',
     border: '1px solid var(--border)',
     borderRadius: '7px',
     cursor: 'pointer',
+    color: 'var(--text2)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: '26px', height: '26px', padding: 0,
     transition: 'background 0.15s',
@@ -768,7 +769,7 @@ const s: Record<string, React.CSSProperties> = {
 
   emptyCol: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    borderWidth: '1.5px', borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: '1.5px', borderStyle: 'dashed', borderColor: 'var(--border)',
     borderRadius: '12px',
     padding: '28px 20px',
     fontSize: '12px', color: 'var(--muted)',
@@ -782,7 +783,7 @@ const s: Record<string, React.CSSProperties> = {
 // Card styles
 const c: Record<string, React.CSSProperties> = {
   card: {
-    background: 'linear-gradient(180deg, #1e1f32 0%, #1a1b2e 100%)',
+    background: 'var(--surface)',
     borderRadius: '10px',
     border: '1px solid var(--border)',
     borderLeftWidth: '3px',
@@ -793,28 +794,30 @@ const c: Record<string, React.CSSProperties> = {
     display: 'flex',
     minHeight: '72px',
     flexShrink: 0,
-    transition: 'background 0.15s, box-shadow 0.15s',
+    transition: 'background 0.15s, box-shadow 0.15s, border-color 0.15s',
     userSelect: 'none' as const,
     overflow: 'hidden',
+    boxShadow: 'var(--shadow-card)',
   },
   dragging: { opacity: 0.35, transform: 'scale(0.98)', cursor: 'grabbing' },
   dropIndicatorTop: {
     position: 'absolute' as const, top: '-4px', left: '4px', right: '4px',
     height: '3px', borderRadius: '2px',
-    background: 'linear-gradient(90deg, #7c5cfc, #a78bfa)',
-    boxShadow: '0 0 8px rgba(124,92,252,0.5)',
+    background: 'linear-gradient(90deg, #E06C4D, #F0926E)',
+    boxShadow: '0 0 8px rgba(224,108,77,0.5)',
     zIndex: 10,
   },
   dropIndicatorBottom: {
     position: 'absolute' as const, bottom: '-4px', left: '4px', right: '4px',
     height: '3px', borderRadius: '2px',
-    background: 'linear-gradient(90deg, #7c5cfc, #a78bfa)',
-    boxShadow: '0 0 8px rgba(124,92,252,0.5)',
+    background: 'linear-gradient(90deg, #E06C4D, #F0926E)',
+    boxShadow: '0 0 8px rgba(224,108,77,0.5)',
     zIndex: 10,
   },
   hover: {
-    background: 'linear-gradient(180deg, #262740 0%, #1e1f34 100%)',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
+    background: 'var(--surface2)',
+    borderColor: 'var(--border2)',
+    boxShadow: 'var(--shadow-elevated)',
   },
   stripe: { width: '3px', flexShrink: 0 },
   body: { flex: 1, padding: '12px 14px 10px', display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 },
@@ -845,7 +848,7 @@ const c: Record<string, React.CSSProperties> = {
   statusDot: { width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0 },
 
   moreBtn: {
-    background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)',
+    background: 'var(--surface2)', border: '1px solid var(--border)',
     borderRadius: '6px', color: 'var(--muted)',
     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: '24px', height: '24px', padding: 0,
@@ -855,7 +858,7 @@ const c: Record<string, React.CSSProperties> = {
     background: 'var(--surface)', border: '1px solid var(--border2)',
     borderRadius: '12px', padding: '6px',
     zIndex: 200, minWidth: '148px',
-    boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
+    boxShadow: 'var(--shadow-modal)',
     animation: 'popIn 0.15s ease',
   },
   menuLabel: {
@@ -884,7 +887,7 @@ const c: Record<string, React.CSSProperties> = {
     position: 'absolute' as const, right: 0, bottom: '28px',
     background: 'var(--surface)', border: '1px solid var(--border2)',
     borderRadius: '10px', padding: '4px', zIndex: 200, minWidth: '130px',
-    boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+    boxShadow: 'var(--shadow-modal)',
     maxHeight: '220px', overflowY: 'auto' as const,
   },
   dropdownItem: {
@@ -1156,15 +1159,16 @@ function TaskDetailModal({ task, flashField, onClose, onUpdateField, onStatusCha
 // Modal styles
 const m: Record<string, React.CSSProperties> = {
   overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+    position: 'fixed', inset: 0, background: 'rgba(20,18,14,0.45)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 1000, padding: '24px',
+    backdropFilter: 'blur(2px)',
   },
   modal: {
     background: 'var(--surface)', border: '1px solid var(--border2)',
     borderRadius: '18px', padding: '28px', width: '100%', maxWidth: '560px',
     maxHeight: '85vh', overflowY: 'auto' as const, position: 'relative' as const,
-    boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+    boxShadow: 'var(--shadow-modal)',
   },
   closeBtn: {
     position: 'absolute' as const, top: '16px', right: '16px',
@@ -1236,7 +1240,7 @@ const m: Record<string, React.CSSProperties> = {
   updateHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' },
   updateAuthor: { fontSize: '12px', fontWeight: 600, color: 'var(--accent-light)' },
   updateDate: { fontSize: '10px', color: 'var(--muted)' },
-  updateText: { fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.55 },
+  updateText: { fontSize: '13px', color: 'var(--text2)', lineHeight: 1.55 },
 
   addUpdateRow: { display: 'flex', gap: '12px', marginTop: '4px' },
   addUpdateInputWrap: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: '8px' },

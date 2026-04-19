@@ -151,7 +151,7 @@ export default function ProfilePanel({ open, onClose, name, email, team }: Props
                 width: '64px',
                 height: '64px',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)',
+                background: 'linear-gradient(135deg, #E06C4D, #F0926E)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

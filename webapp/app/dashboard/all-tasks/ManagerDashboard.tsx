@@ -28,10 +28,10 @@ interface Props {
 const TEAMS = ['Product', 'Engineering', 'Sales', 'Marketing', 'Content', 'Customer Support'] as const
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string; dot: string }> = {
-  backlog:     { label: 'Inbox',       bg: 'rgba(245,158,11,0.12)', fg: '#f59e0b', dot: '#d97706' },
-  active:      { label: 'To Do',       bg: 'rgba(148,163,184,0.16)', fg: '#cbd5e1', dot: '#64748b' },
-  in_progress: { label: 'In Progress', bg: 'rgba(96,165,250,0.14)',  fg: '#60a5fa', dot: '#3b82f6' },
-  completed:   { label: 'Done',        bg: 'rgba(74,222,128,0.14)',  fg: '#4ade80', dot: '#22c55e' },
+  backlog:     { label: 'Inbox',       bg: 'rgba(180,83,9,0.10)',   fg: '#B45309', dot: '#92400E' },
+  active:      { label: 'To Do',       bg: 'rgba(87,83,78,0.10)',   fg: '#57534E', dot: '#44403A' },
+  in_progress: { label: 'In Progress', bg: 'rgba(59,91,219,0.10)',  fg: '#3B5BDB', dot: '#2A3EB1' },
+  completed:   { label: 'Done',        bg: 'rgba(5,150,105,0.10)',  fg: '#059669', dot: '#047857' },
 }
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
@@ -264,7 +264,7 @@ export default function ManagerDashboard({ tasks, people }: Props) {
                     </Td>
                     <Td>
                       {t.due_date
-                        ? <span style={{ color: isOverdue ? '#f87171' : 'var(--text2)' }}>{formatDueDate(t.due_date)}</span>
+                        ? <span style={{ color: isOverdue ? '#B91C1C' : 'var(--text2)' }}>{formatDueDate(t.due_date)}</span>
                         : <span style={{ color: 'var(--muted)' }}>—</span>}
                     </Td>
                     <Td>
@@ -273,7 +273,7 @@ export default function ManagerDashboard({ tasks, people }: Props) {
                     <Td>
                       {t.status === 'completed' || pending === null
                         ? <span style={{ color: 'var(--muted)' }}>—</span>
-                        : <span style={{ color: pending > 5 ? '#f59e0b' : 'var(--text2)' }}>{pending}d</span>}
+                        : <span style={{ color: pending > 5 ? '#B45309' : 'var(--text2)' }}>{pending}d</span>}
                     </Td>
                   </tr>
                 )
@@ -408,9 +408,9 @@ function MultiSelect({
 function SummaryCard({ label, value, tone }: { label: string; value: number; tone: 'neutral' | 'progress' | 'done' | 'warn' }) {
   const toneStyles: Record<typeof tone, { border: string; glow: string; fg: string }> = {
     neutral:  { border: 'var(--border)',       glow: 'transparent',        fg: 'var(--text)' },
-    progress: { border: 'rgba(96,165,250,0.3)',  glow: 'rgba(96,165,250,0.08)', fg: '#60a5fa' },
-    done:     { border: 'rgba(74,222,128,0.3)',  glow: 'rgba(74,222,128,0.08)', fg: '#4ade80' },
-    warn:     { border: 'rgba(245,158,11,0.35)', glow: 'rgba(245,158,11,0.1)',  fg: '#f59e0b' },
+    progress: { border: 'rgba(59,91,219,0.28)',  glow: 'rgba(59,91,219,0.06)',  fg: '#3B5BDB' },
+    done:     { border: 'rgba(5,150,105,0.28)',   glow: 'rgba(5,150,105,0.06)',  fg: '#059669' },
+    warn:     { border: 'rgba(180,83,9,0.32)',    glow: 'rgba(180,83,9,0.08)',   fg: '#B45309' },
   }
   const tt = toneStyles[tone]
   return (
@@ -454,10 +454,10 @@ function Td({ children }: { children: React.ReactNode }) {
 function PriorityBadge({ value }: { value: string }) {
   const v = value.toLowerCase()
   const colors = v === 'high'
-    ? { bg: 'rgba(248,113,113,0.14)', fg: '#f87171' }
+    ? { bg: 'rgba(185,28,28,0.10)', fg: '#B91C1C' }
     : v === 'medium'
-      ? { bg: 'rgba(245,158,11,0.14)', fg: '#f59e0b' }
-      : { bg: 'rgba(148,163,184,0.16)', fg: '#cbd5e1' }
+      ? { bg: 'rgba(180,83,9,0.10)', fg: '#B45309' }
+      : { bg: 'rgba(87,83,78,0.10)', fg: '#57534E' }
   return (
     <span style={{
       display: 'inline-block',
@@ -553,7 +553,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--surface)',
     border: '1px solid var(--border2)',
     borderRadius: '10px',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+    boxShadow: 'var(--shadow-modal)',
     zIndex: 20,
     animation: 'popIn 0.15s ease',
   },
@@ -600,7 +600,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '26px',
     height: '26px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)',
+    background: 'linear-gradient(135deg, #E06C4D, #F0926E)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

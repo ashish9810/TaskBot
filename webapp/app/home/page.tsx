@@ -170,7 +170,7 @@ export default function HomePage() {
             {/* Large card */}
             <div className="reveal bento-card bento-large" style={{ ...s.bentoCard, gridColumn: 'span 2' }}>
               <div style={s.bentoIcon}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#7c5cfc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#E06C4D" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </div>
               <h3 style={s.bentoTitle}>Assign tasks from any Slack channel</h3>
               <p style={s.bentoDesc}>
@@ -205,7 +205,7 @@ export default function HomePage() {
 
             <div className="reveal bento-card" style={s.bentoCard}>
               <div style={s.bentoIcon}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="#F0926E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </div>
               <h3 style={s.bentoTitle}>See your whole team</h3>
               <p style={s.bentoDesc}>Search by name, check anyone&apos;s task list in seconds. Built for managers who value their time.</p>
@@ -340,7 +340,7 @@ const s: Record<string, React.CSSProperties> = {
   navLogo: { display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' },
   logoIcon: {
     width: '28px', height: '28px', borderRadius: '8px',
-    background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)',
+    background: 'linear-gradient(135deg, #E06C4D, #F0926E)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: '14px', fontWeight: 700, color: 'white',
   },
@@ -389,7 +389,7 @@ const s: Record<string, React.CSSProperties> = {
     background: 'white', color: '#08080f',
     padding: '14px 32px', borderRadius: '10px',
     fontSize: '16px', fontWeight: 700, textDecoration: 'none',
-    boxShadow: '0 4px 20px rgba(124,92,252,0.2)',
+    boxShadow: '0 4px 20px rgba(224,108,77,0.2)',
   },
   ctaHint: {
     display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -411,7 +411,7 @@ const s: Record<string, React.CSSProperties> = {
     maxWidth: '900px', margin: '0 auto',
     background: '#111120', border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: '16px', overflow: 'hidden',
-    boxShadow: '0 40px 80px rgba(0,0,0,0.5), 0 0 120px rgba(124,92,252,0.06)',
+    boxShadow: '0 40px 80px rgba(0,0,0,0.5), 0 0 120px rgba(224,108,77,0.06)',
   },
   mockupBar: {
     display: 'flex', alignItems: 'center', gap: '12px',
@@ -438,7 +438,7 @@ const s: Record<string, React.CSSProperties> = {
   section: { padding: '100px 0' },
   sectionInner: { maxWidth: '1100px', margin: '0 auto', padding: '0 24px' },
   sectionLabel: {
-    fontSize: '12px', fontWeight: 700, color: '#7c5cfc',
+    fontSize: '12px', fontWeight: 700, color: '#E06C4D',
     letterSpacing: '0.12em', textTransform: 'uppercase',
     marginBottom: '14px', textAlign: 'center',
   },
@@ -472,8 +472,8 @@ const s: Record<string, React.CSSProperties> = {
   bentoTitle: { fontSize: '17px', fontWeight: 700, color: '#ffffff', marginBottom: '10px', letterSpacing: '-0.01em' },
   bentoDesc: { fontSize: '14px', lineHeight: 1.6, color: 'rgba(238,238,248,0.45)' },
   code: {
-    background: 'rgba(124,92,252,0.12)', border: '1px solid rgba(124,92,252,0.2)',
-    borderRadius: '5px', padding: '2px 7px', fontSize: '13px', color: '#a78bfa',
+    background: 'rgba(224,108,77,0.12)', border: '1px solid rgba(224,108,77,0.2)',
+    borderRadius: '5px', padding: '2px 7px', fontSize: '13px', color: '#F0926E',
     fontFamily: 'monospace',
   },
 
@@ -485,7 +485,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   stepNum: {
     width: '40px', height: '40px', borderRadius: '50%',
-    background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)',
+    background: 'linear-gradient(135deg, #E06C4D, #F0926E)',
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
     fontSize: '18px', fontWeight: 800, color: 'white', marginBottom: '16px',
   },
@@ -498,7 +498,7 @@ const s: Record<string, React.CSSProperties> = {
   testimonialAuthor: { display: 'flex', alignItems: 'center', gap: '10px' },
   testimonialAvatar: {
     width: '32px', height: '32px', borderRadius: '50%',
-    background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)',
+    background: 'linear-gradient(135deg, #E06C4D, #F0926E)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: '13px', fontWeight: 700, color: 'white',
   },
@@ -512,10 +512,10 @@ const s: Record<string, React.CSSProperties> = {
     background: 'white', color: '#08080f',
     padding: '16px 40px', borderRadius: '12px',
     fontSize: '17px', fontWeight: 700, textDecoration: 'none',
-    boxShadow: '0 4px 30px rgba(124,92,252,0.25)',
+    boxShadow: '0 4px 30px rgba(224,108,77,0.25)',
   },
   ctaSubLink: { marginTop: '16px', fontSize: '14px', color: 'rgba(238,238,248,0.4)' },
-  ctaSubA: { color: '#7c5cfc', textDecoration: 'none', fontWeight: 500 },
+  ctaSubA: { color: '#E06C4D', textDecoration: 'none', fontWeight: 500 },
 
   // Footer
   footer: {

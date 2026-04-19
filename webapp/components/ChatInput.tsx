@@ -243,7 +243,7 @@ function Spinner() {
   return (
     <span style={{
       display: 'inline-block', width: '12px', height: '12px',
-      border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white',
+      border: '2px solid rgba(255,255,255,0.35)', borderTopColor: 'white',
       borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0,
     }} />
   )
@@ -253,17 +253,16 @@ const s: Record<string, React.CSSProperties> = {
   wrap: { marginBottom: '24px' },
 
   box: {
-    background: 'rgba(255,255,255,0.03)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
     borderRadius: '16px',
     overflow: 'hidden',
     transition: 'border-color 0.2s, box-shadow 0.2s',
+    boxShadow: 'var(--shadow-card)',
   },
   boxFocused: {
-    borderColor: 'rgba(124,92,252,0.5)',
-    boxShadow: '0 0 0 3px rgba(124,92,252,0.1), 0 8px 32px rgba(0,0,0,0.3)',
+    borderColor: 'rgba(224,108,77,0.55)',
+    boxShadow: '0 0 0 3px rgba(224,108,77,0.12), var(--shadow-elevated)',
   },
   boxHeader: {
     display: 'flex',
@@ -314,12 +313,12 @@ const s: Record<string, React.CSSProperties> = {
     padding: '0 16px 12px',
   },
   chip: {
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'var(--surface2)',
+    border: '1px solid var(--border)',
     borderRadius: '100px',
     padding: '4px 12px',
     fontSize: '12px',
-    color: 'var(--muted)',
+    color: 'var(--text2)',
     cursor: 'pointer',
     fontFamily: 'inherit',
     whiteSpace: 'nowrap' as const,
@@ -329,7 +328,7 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '10px 12px 12px',
-    borderTop: '1px solid rgba(255,255,255,0.05)',
+    borderTop: '1px solid var(--border)',
   },
   footerHint: {
     fontSize: '11px',
@@ -351,12 +350,12 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: 'inherit',
   },
   sendBtnDisabled: { opacity: 0.4, cursor: 'not-allowed' },
-  error: { fontSize: '13px', color: '#f87171', marginTop: '8px', paddingLeft: '4px' },
+  error: { fontSize: '13px', color: '#B91C1C', marginTop: '8px', paddingLeft: '4px' },
 
   confirmBox: {
     marginTop: '10px',
-    background: 'rgba(124,92,252,0.06)',
-    border: '1px solid rgba(124,92,252,0.2)',
+    background: 'var(--accent-glow)',
+    border: '1px solid rgba(224,108,77,0.28)',
     borderRadius: '14px',
     overflow: 'hidden',
   },
@@ -365,13 +364,13 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '12px 16px',
-    borderBottom: '1px solid rgba(124,92,252,0.12)',
+    borderBottom: '1px solid rgba(224,108,77,0.18)',
   },
   confirmIcon: {
     width: '24px',
     height: '24px',
     borderRadius: '6px',
-    background: 'rgba(124,92,252,0.2)',
+    background: 'rgba(224,108,77,0.18)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -384,14 +383,14 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
     borderRadius: '8px',
     padding: '9px 12px',
   },
   pendingDot: {
     width: '6px', height: '6px', borderRadius: '50%',
-    background: 'var(--accent)', flexShrink: 0, opacity: 0.7,
+    background: 'var(--accent)', flexShrink: 0, opacity: 0.8,
   },
   pendingInput: {
     flex: 1,
@@ -405,7 +404,7 @@ const s: Record<string, React.CSSProperties> = {
   assigneeChip: {
     fontSize: '11px',
     color: 'var(--accent)',
-    background: 'rgba(124,92,252,0.15)',
+    background: 'rgba(224,108,77,0.15)',
     borderRadius: '100px',
     padding: '2px 8px',
     whiteSpace: 'nowrap' as const,
@@ -418,7 +417,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   confirmActions: {
     display: 'flex', justifyContent: 'flex-end', gap: '8px',
-    padding: '10px 12px 12px', borderTop: '1px solid rgba(255,255,255,0.05)',
+    padding: '10px 12px 12px', borderTop: '1px solid var(--border)',
   },
   cancelBtn: {
     background: 'none', border: '1px solid var(--border)', borderRadius: '8px',

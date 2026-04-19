@@ -129,13 +129,13 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
           width: '56px',
           height: '56px',
           borderRadius: '50%',
-          background: 'var(--accent, #7c5cfc)',
+          background: 'var(--accent, #E06C4D)',
           border: 'none',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 4px 20px rgba(124, 92, 252, 0.4)',
+          boxShadow: '0 4px 20px rgba(224, 108, 77, 0.35)',
           zIndex: 1000,
           transition: 'transform 0.2s, box-shadow 0.2s',
           transform: open ? 'rotate(45deg)' : 'none',
@@ -160,20 +160,20 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
           right: '24px',
           width: '400px',
           height: '520px',
-          background: 'var(--surface, #111120)',
-          border: '1px solid var(--border, rgba(255,255,255,0.07))',
+          background: 'var(--surface, #FFFFFF)',
+          border: '1px solid var(--border, #E6E0D3)',
           borderRadius: '16px',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
           zIndex: 999,
-          boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+          boxShadow: 'var(--shadow-modal, 0 16px 40px rgba(20,18,14,0.14), 0 4px 12px rgba(20,18,14,0.06))',
           animation: 'popIn 0.2s ease',
         }}>
           {/* Header */}
           <div style={{
             padding: '16px 18px',
-            borderBottom: '1px solid var(--border, rgba(255,255,255,0.07))',
+            borderBottom: '1px solid var(--border, #E6E0D3)',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
@@ -183,7 +183,7 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
               width: '32px',
               height: '32px',
               borderRadius: '10px',
-              background: 'var(--accent, #7c5cfc)',
+              background: 'var(--accent, #E06C4D)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -194,8 +194,8 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
               </svg>
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text, #eeeef8)' }}>Ping Assistant</div>
-              <div style={{ fontSize: '11px', color: 'var(--muted, #888)' }}>Ask me anything about your tasks</div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text, #1F1D18)' }}>Ping Assistant</div>
+              <div style={{ fontSize: '11px', color: 'var(--muted, #8A8275)' }}>Ask me anything about your tasks</div>
             </div>
           </div>
 
@@ -221,9 +221,9 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
                   padding: '10px 14px',
                   borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
                   background: msg.role === 'user'
-                    ? 'var(--accent, #7c5cfc)'
-                    : 'var(--surface3, #1e1e32)',
-                  color: msg.role === 'user' ? '#fff' : 'var(--text2, #ccc)',
+                    ? 'var(--accent, #E06C4D)'
+                    : 'var(--surface3, #EDE7DB)',
+                  color: msg.role === 'user' ? '#fff' : 'var(--text2, #44403A)',
                   fontSize: '13px',
                   lineHeight: 1.5,
                   wordBreak: 'break-word',
@@ -241,8 +241,8 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
                 <div style={{
                   padding: '10px 14px',
                   borderRadius: '14px 14px 14px 4px',
-                  background: 'var(--surface3, #1e1e32)',
-                  color: 'var(--muted, #888)',
+                  background: 'var(--surface3, #EDE7DB)',
+                  color: 'var(--muted, #8A8275)',
                   fontSize: '13px',
                 }}>
                   <span style={{ animation: 'pulse 1.5s infinite' }}>Thinking...</span>
@@ -256,7 +256,7 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
           {/* Input */}
           <div style={{
             padding: '12px 16px',
-            borderTop: '1px solid var(--border, rgba(255,255,255,0.07))',
+            borderTop: '1px solid var(--border, #E6E0D3)',
             display: 'flex',
             gap: '8px',
             alignItems: 'flex-end',
@@ -272,12 +272,12 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
               rows={1}
               style={{
                 flex: 1,
-                background: 'var(--surface2, #18182a)',
-                border: '1px solid var(--border, rgba(255,255,255,0.07))',
+                background: 'var(--surface2, #F4F0E8)',
+                border: '1px solid var(--border, #E6E0D3)',
                 borderRadius: '10px',
                 padding: '10px 14px',
                 fontSize: '13px',
-                color: 'var(--text, #eeeef8)',
+                color: 'var(--text, #1F1D18)',
                 outline: 'none',
                 fontFamily: 'inherit',
                 resize: 'none',
@@ -294,7 +294,7 @@ export default function ChatBot({ onTasksChanged }: { onTasksChanged?: () => voi
                 width: '40px',
                 height: '40px',
                 borderRadius: '10px',
-                background: input.trim() ? 'var(--accent, #7c5cfc)' : 'var(--surface3, #1e1e32)',
+                background: input.trim() ? 'var(--accent, #E06C4D)' : 'var(--surface3, #EDE7DB)',
                 border: 'none',
                 cursor: input.trim() ? 'pointer' : 'default',
                 display: 'flex',

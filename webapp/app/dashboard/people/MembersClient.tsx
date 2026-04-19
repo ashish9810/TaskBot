@@ -150,7 +150,7 @@ const s: Record<string, React.CSSProperties> = {
   sectionTitle: { fontSize: '13px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase' as const, letterSpacing: '0.04em', marginBottom: '10px' },
   list: { display: 'flex', flexDirection: 'column', gap: '8px' },
   card: { display: 'flex', alignItems: 'center', gap: '14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px' },
-  avatar: { width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, color: 'white', flexShrink: 0 },
+  avatar: { width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #E06C4D, #F0926E)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, color: 'white', flexShrink: 0 },
   info: { flex: 1, minWidth: 0 },
   name: { fontSize: '14px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' },
   email: { fontSize: '12px', color: 'var(--muted)', whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' },

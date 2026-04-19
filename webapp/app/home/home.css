@@ -18,14 +18,14 @@
   transform: translateX(-50%);
   width: 800px;
   height: 600px;
-  background: radial-gradient(ellipse at center, rgba(124, 92, 252, 0.15) 0%, transparent 70%);
+  background: radial-gradient(ellipse at center, rgba(224, 108, 77, 0.15) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
 
 /* Gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, #7c5cfc 0%, #a78bfa 50%, #c4b5fd 100%);
+  background: linear-gradient(135deg, #E06C4D 0%, #F0926E 50%, #c4b5fd 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -37,9 +37,9 @@
 }
 
 .bento-card:hover {
-  border-color: rgba(124, 92, 252, 0.35);
+  border-color: rgba(224, 108, 77, 0.35);
   transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 60px rgba(124, 92, 252, 0.08);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 60px rgba(224, 108, 77, 0.08);
 }
 
 /* Problem card hover */
@@ -58,7 +58,7 @@
 }
 
 .step-card:hover {
-  border-color: rgba(124, 92, 252, 0.3);
+  border-color: rgba(224, 108, 77, 0.3);
 }
 
 /* CTA button hover */
@@ -68,7 +68,7 @@
 
 .cta-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(124, 92, 252, 0.3);
+  box-shadow: 0 8px 30px rgba(224, 108, 77, 0.3);
 }
 
 /* Nav blur */

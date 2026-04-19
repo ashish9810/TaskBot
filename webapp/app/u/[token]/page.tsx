@@ -167,7 +167,7 @@ const s: Record<string, React.CSSProperties> = {
   page: { minHeight: '100vh', background: 'var(--bg)', padding: '40px 24px' },
   container: { maxWidth: '600px', margin: '0 auto' },
   header: { display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' },
-  avatar: { width: '52px', height: '52px', borderRadius: '50%', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 700, color: 'white', flexShrink: 0 },
+  avatar: { width: '52px', height: '52px', borderRadius: '50%', background: 'linear-gradient(135deg, #E06C4D, #F0926E)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 700, color: 'white', flexShrink: 0 },
   name: { fontSize: '22px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)', marginBottom: '2px' },
   meta: { fontSize: '13px', color: 'var(--muted)' },
   poweredBy: { fontSize: '12px', color: 'var(--muted)', marginBottom: '32px' },

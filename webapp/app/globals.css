@@ -1,24 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0a0a12;
-  --surface: #111120;
-  --surface2: #18182a;
-  --surface3: #1e1e32;
-  --border: rgba(255, 255, 255, 0.07);
-  --border2: rgba(255, 255, 255, 0.12);
-  --text: #eeeef8;
-  --text2: rgba(238, 238, 248, 0.7);
-  --muted: rgba(238, 238, 248, 0.38);
-  --accent: #7c5cfc;
-  --accent-light: #9d82fd;
-  --accent-glow: rgba(124, 92, 252, 0.2);
-  --todo-color: #94a3b8;
-  --todo-dot: #64748b;
-  --progress-color: #60a5fa;
-  --progress-dot: #3b82f6;
-  --done-color: #4ade80;
-  --done-dot: #22c55e;
+  /* Canvas / surfaces — warm off-white inspired by Asana, Linear, Notion */
+  --bg: #FAF8F4;
+  --surface: #FFFFFF;
+  --surface2: #F4F0E8;
+  --surface3: #EDE7DB;
+
+  /* Borders — warm neutral, subtle but defined */
+  --border: #E6E0D3;
+  --border2: #D5CCB9;
+
+  /* Text — warm near-black, not pure black */
+  --text: #1F1D18;
+  --text2: #44403A;
+  --muted: #8A8275;
+
+  /* Accent — warm coral, reads fresh and non-AI */
+  --accent: #E06C4D;
+  --accent-light: #EF8265;
+  --accent-glow: rgba(224, 108, 77, 0.12);
+
+  /* Status color tokens — muted and warmer than neon versions */
+  --todo-color: #78716C;
+  --todo-dot: #57534E;
+  --progress-color: #3B5BDB;
+  --progress-dot: #2A3EB1;
+  --done-color: #059669;
+  --done-dot: #047857;
+  --inbox-color: #B45309;
+  --inbox-dot: #92400E;
+
+  /* Card / modal shadows — soft and short */
+  --shadow-card: 0 1px 3px rgba(20, 18, 14, 0.06), 0 1px 2px rgba(20, 18, 14, 0.04);
+  --shadow-elevated: 0 4px 12px rgba(20, 18, 14, 0.08), 0 2px 4px rgba(20, 18, 14, 0.04);
+  --shadow-modal: 0 16px 40px rgba(20, 18, 14, 0.14), 0 4px 12px rgba(20, 18, 14, 0.06);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,7 +45,8 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text);
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -43,12 +60,12 @@ body {
 }
 
 @keyframes popIn {
-  0% { opacity: 0; transform: scale(0.95) translateY(4px); }
+  0% { opacity: 0; transform: scale(0.97) translateY(3px); }
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 @keyframes confirmFlash {
-  0% { background-color: rgba(124, 92, 252, 0.15); }
+  0% { background-color: rgba(224, 108, 77, 0.16); }
   100% { background-color: transparent; }
 }
 
@@ -64,13 +81,13 @@ body {
 }
 
 @keyframes dropFlash {
-  0% { box-shadow: 0 0 0 2px rgba(124,92,252,0.7), 0 0 16px rgba(124,92,252,0.4); transform: scale(1.02); }
-  50% { box-shadow: 0 0 0 2px rgba(124,92,252,0.4), 0 0 8px rgba(124,92,252,0.2); transform: scale(1); }
+  0% { box-shadow: 0 0 0 2px rgba(224, 108, 77, 0.55), 0 0 14px rgba(224, 108, 77, 0.3); transform: scale(1.02); }
+  50% { box-shadow: 0 0 0 2px rgba(224, 108, 77, 0.3), 0 0 8px rgba(224, 108, 77, 0.15); transform: scale(1); }
   100% { box-shadow: none; transform: scale(1); }
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+/* Scrollbar — slim, warm, unobtrusive */
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+::-webkit-scrollbar-thumb { background: rgba(31, 29, 24, 0.14); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(31, 29, 24, 0.24); }
