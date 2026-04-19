@@ -269,3 +269,16 @@ CREATE POLICY "Users can read teammates in their workspace"
       WHERE wm.profile_id = auth.uid() AND w.slack_team_id IS NOT NULL
     )
   );
+
+-- 10. Manager Dashboard support
+--     - profiles.team: user's self-selected team (Product, Engineering, Sales, Marketing,
+--       Content, Customer Support). NULL until user picks one in the profile panel.
+--     - tasks.status_changed_at: timestamp of last status change. Drives "Pending Since"
+--       in the manager view and is stamped by every status-mutation code path.
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS team text DEFAULT NULL;
+
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS status_changed_at timestamptz DEFAULT now();
+UPDATE tasks
+  SET status_changed_at = COALESCE(completed_at, created_at)
+  WHERE status_changed_at IS NULL;

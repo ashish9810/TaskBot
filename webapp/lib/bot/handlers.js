@@ -1325,7 +1325,7 @@ function registerHandlers(app, supabase, maps) {
       if (action.type === 'move') {
         let moved = 0;
         for (const task of action.tasks) {
-          const { error } = await supabase.from('tasks').update({ status: action.targetStatus }).eq('id', task.id);
+          const { error } = await supabase.from('tasks').update({ status: action.targetStatus, status_changed_at: new Date().toISOString() }).eq('id', task.id);
           if (!error) moved++;
         }
 
@@ -1570,7 +1570,7 @@ function registerHandlers(app, supabase, maps) {
 
       const { error } = await supabase
         .from('tasks')
-        .update({ status: 'active' })
+        .update({ status: 'active', status_changed_at: new Date().toISOString() })
         .eq('id', taskId);
 
       if (error) {
@@ -1993,6 +1993,7 @@ function registerHandlers(app, supabase, maps) {
 
     await supabase.from('tasks').update({
       status: "completed",
+      status_changed_at: new Date().toISOString(),
       completed_at: new Date()
     }).eq('id', body.actions[0].value);
 
@@ -2004,7 +2005,8 @@ function registerHandlers(app, supabase, maps) {
     await ack();
 
     await supabase.from('tasks').update({
-      status: "active"
+      status: "active",
+      status_changed_at: new Date().toISOString()
     }).eq('id', body.actions[0].value);
 
     await publishHome(client, body.user.id, getTeamId(body), supabase, 'my_tasks');
@@ -2015,7 +2017,8 @@ function registerHandlers(app, supabase, maps) {
     await ack();
 
     await supabase.from('tasks').update({
-      status: "in_progress"
+      status: "in_progress",
+      status_changed_at: new Date().toISOString()
     }).eq('id', body.actions[0].value);
 
     await publishHome(client, body.user.id, getTeamId(body), supabase, 'my_tasks');

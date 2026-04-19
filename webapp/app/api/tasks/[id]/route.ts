@@ -52,6 +52,7 @@ export async function PATCH(
   if (title !== undefined) updates.title = title.trim()
   if (status !== undefined) {
     updates.status = status
+    updates.status_changed_at = new Date().toISOString()
     if (status === 'completed') {
       updates.completed_at = new Date().toISOString()
     } else {

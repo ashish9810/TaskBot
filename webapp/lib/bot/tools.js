@@ -209,6 +209,7 @@ async function executeTool(name, args, ctx) {
       if (args.new_title) updates.title = String(args.new_title).trim();
       if (args.status) {
         updates.status = args.status;
+        updates.status_changed_at = new Date().toISOString();
         updates.completed_at = args.status === 'completed' ? new Date().toISOString() : null;
       }
       if (Object.keys(updates).length === 0) return { error: 'Nothing to update.' };
@@ -227,6 +228,7 @@ async function executeTool(name, args, ctx) {
       const status = args.target_status;
       const updates = {
         status,
+        status_changed_at: new Date().toISOString(),
         completed_at: status === 'completed' ? new Date().toISOString() : null,
       };
       let moved = 0;
