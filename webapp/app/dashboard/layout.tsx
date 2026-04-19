@@ -19,7 +19,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   )
 
   const [{ data: profile }, { data: membership }] = await Promise.all([
-    admin.from('profiles').select('name, email').eq('id', user.id).single(),
+    admin.from('profiles').select('name, email, team').eq('id', user.id).single(),
     admin.from('workspace_members').select('workspace_id, role').eq('profile_id', user.id).limit(1).single(),
   ])
 
@@ -58,7 +58,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div style={styles.shell}>
       <RouteProgressBar />
       <Sidebar
-        user={{ name: profile?.name || user.email || 'User', email: profile?.email || user.email || '' }}
+        user={{ name: profile?.name || user.email || 'User', email: profile?.email || user.email || '', team: profile?.team ?? null }}
         workspace={workspace ? { id: workspace.id, name: workspace.name, slackConnected: !!workspace.slack_team_id, slackTeamId: workspace.slack_team_id, slackWorkspaceName } : null}
         role={membership.role as 'owner' | 'member'}
       />

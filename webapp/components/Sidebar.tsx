@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
+import ProfilePanel from '@/components/ProfilePanel'
 
 type Props = {
-  user: { name: string; email: string }
+  user: { name: string; email: string; team?: string | null }
   workspace: { id: string; name: string; slackConnected: boolean; slackTeamId?: string | null; slackWorkspaceName?: string | null } | null
   role: 'owner' | 'member'
 }
@@ -52,6 +53,7 @@ export default function Sidebar({ user, workspace, role }: Props) {
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [inviteCopied, setInviteCopied] = useState(false)
   const [loadingInvite, setLoadingInvite] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   async function handleInvite() {
     if (inviteLink) {
@@ -197,16 +199,28 @@ export default function Sidebar({ user, workspace, role }: Props) {
 
         {/* User */}
         {!collapsed ? (
-          <div style={s.userRow}>
+          <button
+            type="button"
+            onClick={() => setProfileOpen(true)}
+            style={{ ...s.userRow, cursor: 'pointer', font: 'inherit', textAlign: 'left', width: '100%' }}
+            title="Open profile"
+          >
             <div style={s.avatar}>{(user.name || user.email)[0].toUpperCase()}</div>
             <div style={s.userText}>
               <div style={s.userName}>{user.name}</div>
               <div style={s.userEmail}>{user.email}</div>
             </div>
-          </div>
+          </button>
         ) : (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div style={{ ...s.avatar, cursor: 'default' }} title={user.name}>{(user.name || user.email)[0].toUpperCase()}</div>
+            <button
+              type="button"
+              onClick={() => setProfileOpen(true)}
+              style={{ ...s.avatar, cursor: 'pointer', border: 'none', padding: 0 }}
+              title={user.name || 'Profile'}
+            >
+              {(user.name || user.email)[0].toUpperCase()}
+            </button>
           </div>
         )}
         <button
@@ -225,6 +239,14 @@ export default function Sidebar({ user, workspace, role }: Props) {
           {!collapsed && <span>{signingOut ? 'Signing out...' : 'Sign out'}</span>}
         </button>
       </div>
+
+      <ProfilePanel
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        name={user.name}
+        email={user.email}
+        team={user.team ?? null}
+      />
     </aside>
   )
 }
