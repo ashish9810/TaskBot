@@ -37,6 +37,39 @@
   --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.14), 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
+/* ─── Dark mode — midnight grey, never pure black ───────────────────────── */
+[data-theme="dark"] {
+  --bg: #18191C;
+  --surface: #222327;
+  --surface2: #2A2B30;
+  --surface3: #313236;
+
+  --border: #35363C;
+  --border2: #42444C;
+
+  --text: #E8E9EC;
+  --text2: #B8BBC2;
+  --muted: #6B6E78;
+
+  --accent: #6366F1;
+  --accent-light: #818CF8;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+
+  /* Status colors stay vivid — only tweak glow softness */
+  --todo-color: #6366F1;
+  --todo-dot: #4F46E5;
+  --progress-color: #F59E0B;
+  --progress-dot: #D97706;
+  --done-color: #10B981;
+  --done-dot: #059669;
+  --inbox-color: #9CA3AF;
+  --inbox-dot: #6B7280;
+
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.25);
+  --shadow-elevated: 0 4px 16px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.25);
+  --shadow-modal: 0 20px 48px rgba(0,0,0,0.6), 0 6px 16px rgba(0,0,0,0.35);
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html { scroll-behavior: smooth; }

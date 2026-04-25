@@ -51,6 +51,51 @@ const CORE_COLUMNS: KanbanColumn[] = [
 const DELEGATION_IDS = ['with_tech', 'with_design'] as const
 type DelegationId = typeof DELEGATION_IDS[number]
 
+function ThemeToggle() {
+  const [dark, setDark] = useState(false)
+
+  useEffect(() => {
+    setDark(document.documentElement.getAttribute('data-theme') === 'dark')
+  }, [])
+
+  function toggle() {
+    const next = !dark
+    setDark(next)
+    if (next) {
+      document.documentElement.setAttribute('data-theme', 'dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      document.documentElement.removeAttribute('data-theme')
+      localStorage.setItem('theme', 'light')
+    }
+  }
+
+  return (
+    <button onClick={toggle} title={dark ? 'Switch to light mode' : 'Switch to dark mode'} style={{
+      display: 'flex', alignItems: 'center', gap: '7px',
+      background: 'var(--surface2)', border: '1px solid var(--border2)',
+      borderRadius: '20px', padding: '5px 12px 5px 8px',
+      cursor: 'pointer', color: 'var(--text2)',
+      fontSize: '12px', fontWeight: 500, fontFamily: 'inherit',
+      transition: 'background 0.2s, border-color 0.2s',
+    }}>
+      {dark ? (
+        /* Sun icon */
+        <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="4" stroke="currentColor" strokeWidth="1.6"/>
+          <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M14.36 5.64l1.42-1.42M4.22 15.78l1.42-1.42" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+        </svg>
+      ) : (
+        /* Moon icon */
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+          <path d="M17.5 12.5A7.5 7.5 0 017.5 2.5a7.5 7.5 0 100 15 7.5 7.5 0 0010-5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+      {dark ? 'Light' : 'Dark'}
+    </button>
+  )
+}
+
 export default function DashboardClient({ initialTasks, workspaceId, workspaceName, userId, slackUserId, delegationLabels }: Props) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks as unknown as Task[])
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -313,12 +358,15 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
           <h1 style={s.heading}>My Tasks</h1>
           <span style={s.workspaceBadge}>{workspaceName}</span>
         </div>
-        {activeCount > 0 && (
-          <div style={s.activeCount}>
-            <span style={s.activeDot} />
-            {activeCount} active
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {activeCount > 0 && (
+            <div style={s.activeCount}>
+              <span style={s.activeDot} />
+              {activeCount} active
+            </div>
+          )}
+          <ThemeToggle />
+        </div>
       </div>
 
 
@@ -805,7 +853,7 @@ const s: Record<string, React.CSSProperties> = {
     minWidth: '280px',
     height: '100%',
     flexShrink: 0,
-    background: '#F1F2F4',
+    background: 'var(--surface3)',
     borderRadius: '16px',
     borderWidth: '1px',
     borderStyle: 'solid',
