@@ -146,14 +146,12 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   }, [])
 
   const sortByPos = (a: Task, b: Task) => (a.position ?? Infinity) - (b.position ?? Infinity)
-  const grouped = {
-    backlog:     tasks.filter(t => t.status === 'backlog').sort(sortByPos),
-    active:      tasks.filter(t => t.status === 'active').sort(sortByPos),
-    in_progress: tasks.filter(t => t.status === 'in_progress').sort(sortByPos),
-    completed:   tasks.filter(t => t.status === 'completed').sort(sortByPos),
-  } as Record<string, Task[]>
+  const grouped = COLUMNS.reduce<Record<string, Task[]>>((acc, col) => {
+    acc[col.id] = tasks.filter(t => t.status === col.id).sort(sortByPos)
+    return acc
+  }, {})
 
-  const activeCount = tasks.filter(t => t.status === 'backlog' || t.status === 'active' || t.status === 'in_progress').length
+  const activeCount = tasks.filter(t => t.status !== 'completed').length
 
   async function deleteTask(taskId: string) {
     // Animate fade-out, then remove after animation completes
