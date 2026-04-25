@@ -1180,13 +1180,13 @@ const m: Record<string, React.CSSProperties> = {
   titleRow: { display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', paddingRight: '40px' },
   titleDot: { width: '10px', height: '10px', borderRadius: '50%', marginTop: '7px', flexShrink: 0 },
   title: {
-    fontSize: '20px', fontWeight: 700, color: '#ffffff', cursor: 'text',
+    fontSize: '20px', fontWeight: 700, color: 'var(--text)', cursor: 'text',
     letterSpacing: '-0.02em', lineHeight: 1.35, wordBreak: 'break-word' as const,
   },
   titleInput: {
     width: '100%', background: 'transparent', border: 'none',
     borderBottom: '2px solid var(--accent)', outline: 'none',
-    fontSize: '20px', fontWeight: 700, color: '#ffffff',
+    fontSize: '20px', fontWeight: 700, color: 'var(--text)',
     fontFamily: 'inherit', padding: '0 0 4px', lineHeight: 1.35,
   },
 
@@ -1206,7 +1206,7 @@ const m: Record<string, React.CSSProperties> = {
     background: 'var(--surface2)', border: '1px solid var(--border)',
     borderRadius: '8px', padding: '7px 12px', fontSize: '13px',
     color: 'var(--text)', fontFamily: 'inherit', width: 'fit-content',
-    outline: 'none', colorScheme: 'dark',
+    outline: 'none', colorScheme: 'light',
   },
 
   divider: { height: '1px', background: 'var(--border)', margin: '4px 0 16px' },
