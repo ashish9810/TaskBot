@@ -91,20 +91,20 @@ export default function Sidebar({ user, workspace, role }: Props) {
 
   return (
     <aside style={{ ...s.sidebar, width: collapsed ? 64 : 220 }}>
-      {/* Collapse toggle */}
+      {/* Collapse toggle — visible tab on right edge */}
       <button
         onClick={() => setCollapsed(v => !v)}
         style={s.collapseBtn}
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         <svg
-          width="12"
-          height="12"
-          viewBox="0 0 12 12"
+          width="14"
+          height="14"
+          viewBox="0 0 14 14"
           fill="none"
           style={{ transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease' }}
         >
-          <path d="M7.5 2L3.5 6l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M9 2L5 7l4 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
 
@@ -113,11 +113,14 @@ export default function Sidebar({ user, workspace, role }: Props) {
         <div style={{ ...s.workspaceRow, padding: collapsed ? '4px 0' : '4px 8px', justifyContent: collapsed ? 'center' : 'flex-start' }}>
           <div style={s.workspaceAvatar}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/ping_logo.jpeg" alt="Ping" width={28} height={28} style={{ borderRadius: '8px', objectFit: 'cover', display: 'block' }} />
+            <img src="/ping_logo.jpeg" alt="Ping" width={32} height={32} style={{ borderRadius: '8px', objectFit: 'cover', display: 'block' }} />
           </div>
           {!collapsed && (
-            <div style={s.workspaceName} title={workspace?.name || 'Ping'}>
-              {workspace?.name || 'Ping'}
+            <div>
+              <div style={s.appName}>Ping</div>
+              <div style={s.workspaceName} title={workspace?.name || ''}>
+                {workspace?.name || ''}
+              </div>
             </div>
           )}
         </div>
@@ -138,11 +141,11 @@ export default function Sidebar({ user, workspace, role }: Props) {
                   padding: collapsed ? '9px' : '9px 12px',
                 }}
               >
-                <span style={{ ...s.navIcon, color: active ? 'var(--text)' : 'var(--muted)' }}>
+                <span style={{ ...s.navIcon, color: active ? 'var(--accent)' : 'var(--muted)' }}>
                   {item.icon}
                 </span>
                 {!collapsed && (
-                  <span style={{ color: active ? 'var(--text)' : 'var(--muted)' }}>
+                  <span style={{ color: active ? 'var(--accent)' : 'var(--text2)' }}>
                     {item.label}
                   </span>
                 )}
@@ -260,7 +263,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    padding: '20px 10px 16px',
+    padding: '16px 10px 16px',
     position: 'sticky',
     top: 0,
     height: '100vh',
@@ -270,32 +273,35 @@ const s: Record<string, React.CSSProperties> = {
   },
   collapseBtn: {
     position: 'absolute',
-    right: '-10px',
-    top: '24px',
-    width: '20px',
-    height: '20px',
+    right: '-14px',
+    top: '28px',
+    width: '28px',
+    height: '28px',
     borderRadius: '50%',
-    background: 'var(--surface2)',
-    border: '1px solid var(--border)',
+    background: 'var(--surface)',
+    border: '1.5px solid var(--border2)',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    color: 'var(--muted)',
+    color: 'var(--text2)',
     zIndex: 20,
     padding: 0,
     flexShrink: 0,
+    transition: 'background 0.15s, color 0.15s',
   },
-  top: { display: 'flex', flexDirection: 'column', gap: '24px' },
+  top: { display: 'flex', flexDirection: 'column', gap: '20px' },
   workspaceRow: {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
     overflow: 'hidden',
+    padding: '2px 4px',
   },
   workspaceAvatar: {
-    width: '28px',
-    height: '28px',
+    width: '32px',
+    height: '32px',
     borderRadius: '8px',
     overflow: 'hidden',
     flexShrink: 0,
@@ -303,14 +309,21 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  workspaceName: {
+  appName: {
     fontSize: '14px',
     fontWeight: 700,
     letterSpacing: '-0.02em',
     color: 'var(--text)',
+    lineHeight: 1.2,
+  },
+  workspaceName: {
+    fontSize: '11px',
+    fontWeight: 400,
+    color: 'var(--muted)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    lineHeight: 1.3,
   },
   nav: { display: 'flex', flexDirection: 'column', gap: '2px' },
   navItem: {
@@ -318,14 +331,15 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '10px',
     borderRadius: '8px',
-    fontSize: '13.5px',
+    fontSize: '13px',
     fontWeight: 500,
     textDecoration: 'none',
     transition: 'background 0.15s',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
+    color: 'var(--text2)',
   },
-  navItemActive: { background: 'rgba(79,70,229,0.08)', color: 'var(--accent)' },
+  navItemActive: { background: 'rgba(79,70,229,0.09)', color: 'var(--accent)' },
   navIcon: { flexShrink: 0, display: 'flex', alignItems: 'center' },
   bottom: { display: 'flex', flexDirection: 'column', gap: '8px' },
   inviteBtn: {
