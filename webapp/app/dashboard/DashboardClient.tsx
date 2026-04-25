@@ -220,15 +220,28 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   }
 
   async function moveTask(taskId: string, newStatus: string) {
-    setTasks(prev => prev.map(t =>
-      t.id === taskId
-        ? { ...t, status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }
-        : t
-    ))
+    // Bump to position -1 so it sorts to the top of the destination column
+    setTasks(prev => {
+      const task = prev.find(t => t.id === taskId)
+      if (!task) return prev
+      const updated = {
+        ...task,
+        status: newStatus,
+        position: -1,
+        completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
+      }
+      return [updated, ...prev.filter(t => t.id !== taskId)]
+    })
+    // Flash the card when it lands
+    setJustDroppedId(taskId)
+    setTimeout(() => setJustDroppedId(null), 700)
+    // Suppress realtime echo so the fresh fetch doesn't undo the position
+    reorderCooldown.current = true
+    setTimeout(() => { reorderCooldown.current = false }, 2500)
     await fetch(`/api/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify({ status: newStatus, position: -1 }),
     })
   }
 
@@ -692,7 +705,7 @@ function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf,
           ...(hovered && !isDragging ? c.hover : {}),
           cursor: 'pointer',
           ...(isDeleting ? { animation: 'fadeOutShrink 0.35s ease forwards', pointerEvents: 'none' as const } : {}),
-          ...(isJustDropped ? { animation: 'dropFlash 0.6s ease' } : {}),
+          ...(isJustDropped ? { animation: 'dropFlash 0.7s ease' } : {}),
         }}
       >
       <div style={c.body}>

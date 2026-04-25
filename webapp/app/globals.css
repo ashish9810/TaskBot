@@ -115,9 +115,9 @@ body {
 }
 
 @keyframes dropFlash {
-  0% { box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.55), 0 0 14px rgba(79, 70, 229, 0.3); transform: scale(1.02); }
-  50% { box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.3), 0 0 8px rgba(79, 70, 229, 0.15); transform: scale(1); }
-  100% { box-shadow: none; transform: scale(1); }
+  0%   { box-shadow: 0 0 0 2.5px rgba(79,70,229,0.7), 0 0 20px rgba(79,70,229,0.35); transform: scale(1.025); opacity: 0.85; }
+  35%  { box-shadow: 0 0 0 2px rgba(79,70,229,0.4),   0 0 10px rgba(79,70,229,0.18); transform: scale(1);     opacity: 1;    }
+  100% { box-shadow: none; transform: scale(1); opacity: 1; }
 }
 
 /* Scrollbar — slim, clean */
