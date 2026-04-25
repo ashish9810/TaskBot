@@ -11,6 +11,8 @@ const STATUS_LABELS = {
   backlog: 'Inbox',
   active: 'To Do',
   in_progress: 'In Progress',
+  with_tech: 'In Tech',
+  with_design: 'In Design',
   completed: 'Done',
 };
 
@@ -32,7 +34,7 @@ const TOOL_DEFINITIONS = [
                 title: { type: 'string', description: 'Clean task title (no filler words).' },
                 status: {
                   type: 'string',
-                  enum: ['backlog', 'active', 'in_progress', 'completed'],
+                  enum: ['backlog', 'active', 'in_progress', 'with_tech', 'with_design', 'completed'],
                   description: 'Optional. Defaults to "active" (To Do) when omitted.',
                 },
               },
@@ -54,7 +56,7 @@ const TOOL_DEFINITIONS = [
         properties: {
           task_identifier: { type: 'string', description: 'Task id (UUID) or a substring of the task title.' },
           new_title: { type: 'string', description: 'New title for the task.' },
-          status: { type: 'string', enum: ['backlog', 'active', 'in_progress', 'completed'] },
+          status: { type: 'string', enum: ['backlog', 'active', 'in_progress', 'with_tech', 'with_design', 'completed'] },
         },
         required: ['task_identifier'],
       },
@@ -73,7 +75,7 @@ const TOOL_DEFINITIONS = [
             items: { type: 'string' },
             description: 'Task ids (UUIDs) or substrings of task titles.',
           },
-          target_status: { type: 'string', enum: ['backlog', 'active', 'in_progress', 'completed'] },
+          target_status: { type: 'string', enum: ['backlog', 'active', 'in_progress', 'with_tech', 'with_design', 'completed'] },
         },
         required: ['task_identifiers', 'target_status'],
       },
@@ -107,7 +109,7 @@ const TOOL_DEFINITIONS = [
         properties: {
           status: {
             type: 'string',
-            enum: ['backlog', 'active', 'in_progress', 'completed', 'all'],
+            enum: ['backlog', 'active', 'in_progress', 'with_tech', 'with_design', 'completed', 'all'],
             description: 'Which column to list. Omit or use "all" for everything.',
           },
         },
@@ -136,6 +138,8 @@ Behavior:
   - "inbox" / "backlog" → backlog
   - "to do" / "todo" / "to-do" → active
   - "in progress" / "in-progress" / "working on" / "doing" → in_progress
+  - "in tech" / "with tech" / "tech team" → with_tech
+  - "in design" / "with design" / "design team" → with_design
   - "done" / "complete" / "completed" / "finished" → completed
 - When the user says "create this task X", "add X", "remind me to X", call create_tasks.
 - When the user asks "how many tasks in todo?" call list_tasks with status="active" and respond with the count.
@@ -143,7 +147,7 @@ Behavior:
 
 function buildTaskContextString(taskContext) {
   const lines = ['Current tasks snapshot:'];
-  for (const status of ['backlog', 'active', 'in_progress', 'completed']) {
+  for (const status of ['backlog', 'active', 'in_progress', 'with_tech', 'with_design', 'completed']) {
     const label = STATUS_LABELS[status];
     const list = taskContext[status] || [];
     if (list.length === 0) {

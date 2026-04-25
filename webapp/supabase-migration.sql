@@ -301,3 +301,10 @@ ALTER TABLE tasks ALTER COLUMN status_changed_at SET DEFAULT now();
 --         completed_at IS NULL
 --         OR status_changed_at > completed_at + interval '1 minute'
 --       );
+
+-- 11. Delegation statuses — workspace-level editable labels for "In Tech" / "In Design" columns.
+--     The status IDs (with_tech, with_design) are fixed in the application layer;
+--     these columns let each workspace rename the labels shown to users.
+ALTER TABLE workspaces
+  ADD COLUMN IF NOT EXISTS tech_label   text DEFAULT 'In Tech',
+  ADD COLUMN IF NOT EXISTS design_label text DEFAULT 'In Design';

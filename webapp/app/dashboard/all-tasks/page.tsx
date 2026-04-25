@@ -25,6 +25,8 @@ export default async function AllTasksPage() {
     id: string
     name: string
     slack_team_id: string | null
+    tech_label: string | null
+    design_label: string | null
   }
 
   // All workspace members (with their team selection)
@@ -116,5 +118,10 @@ export default async function AllTasksPage() {
       team: p.team || null,
     }))
 
-  return <ManagerDashboard tasks={tasks} people={people} />
+  const delegationLabels = {
+    with_tech: workspace.tech_label || 'In Tech',
+    with_design: workspace.design_label || 'In Design',
+  }
+
+  return <ManagerDashboard tasks={tasks} people={people} delegationLabels={delegationLabels} />
 }

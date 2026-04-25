@@ -22,7 +22,7 @@ export default async function DashboardPage() {
   if (!membership) return null
 
   const workspace = {
-    ...(membership.workspaces as unknown as { id: string; name: string; slack_team_id: string | null }),
+    ...(membership.workspaces as unknown as { id: string; name: string; slack_team_id: string | null; tech_label: string | null; design_label: string | null }),
     role: membership.role,
   }
 
@@ -62,6 +62,11 @@ export default async function DashboardPage() {
     tasks = data || []
   }
 
+  const delegationLabels = {
+    with_tech: workspace.tech_label || 'In Tech',
+    with_design: workspace.design_label || 'In Design',
+  }
+
   return (
     <DashboardClient
       initialTasks={tasks}
@@ -69,6 +74,7 @@ export default async function DashboardPage() {
       workspaceName={workspace.name}
       userId={user.id}
       slackUserId={slackId}
+      delegationLabels={delegationLabels}
     />
   )
 }

@@ -23,23 +23,19 @@ export interface ManagerPerson {
 interface Props {
   tasks: ManagerTask[]
   people: ManagerPerson[]
+  delegationLabels: { with_tech: string; with_design: string }
 }
 
 const TEAMS = ['Product', 'Engineering', 'Sales', 'Marketing', 'Content', 'Customer Support'] as const
 
-const STATUS_META: Record<string, { label: string; bg: string; fg: string; dot: string }> = {
+const BASE_STATUS_META: Record<string, { label: string; bg: string; fg: string; dot: string }> = {
   backlog:     { label: 'Inbox',       bg: 'rgba(180,83,9,0.10)',   fg: '#B45309', dot: '#92400E' },
   active:      { label: 'To Do',       bg: 'rgba(87,83,78,0.10)',   fg: '#57534E', dot: '#44403A' },
   in_progress: { label: 'In Progress', bg: 'rgba(59,91,219,0.10)',  fg: '#3B5BDB', dot: '#2A3EB1' },
+  with_tech:   { label: 'In Tech',     bg: 'rgba(79,70,229,0.10)',  fg: '#4F46E5', dot: '#3730A3' },
+  with_design: { label: 'In Design',   bg: 'rgba(124,58,237,0.10)', fg: '#7C3AED', dot: '#6D28D9' },
   completed:   { label: 'Done',        bg: 'rgba(5,150,105,0.10)',  fg: '#059669', dot: '#047857' },
 }
-
-const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'active', label: 'To Do' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Done' },
-  { value: 'backlog', label: 'Inbox' },
-]
 
 const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 }
 
@@ -65,7 +61,22 @@ function initialsOf(name: string): string {
   return s.slice(0, 2).toUpperCase()
 }
 
-export default function ManagerDashboard({ tasks, people }: Props) {
+export default function ManagerDashboard({ tasks, people, delegationLabels }: Props) {
+  // Build status meta using workspace-editable delegation labels
+  const STATUS_META = {
+    ...BASE_STATUS_META,
+    with_tech:   { label: delegationLabels.with_tech,   bg: 'rgba(79,70,229,0.10)',  fg: '#4F46E5', dot: '#3730A3' },
+    with_design: { label: delegationLabels.with_design, bg: 'rgba(124,58,237,0.10)', fg: '#7C3AED', dot: '#6D28D9' },
+  }
+  const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+    { value: 'active',      label: 'To Do' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'with_tech',   label: delegationLabels.with_tech },
+    { value: 'with_design', label: delegationLabels.with_design },
+    { value: 'completed',   label: 'Done' },
+    { value: 'backlog',     label: 'Inbox' },
+  ]
+
   // Empty set = no filter (show all). Non-empty = show only selected values.
   const [teamFilter, setTeamFilter] = useState<Set<string>>(new Set())
   const [personFilter, setPersonFilter] = useState<Set<string>>(new Set())
@@ -268,7 +279,7 @@ export default function ManagerDashboard({ tasks, people }: Props) {
                         : <span style={{ color: 'var(--muted)' }}>—</span>}
                     </Td>
                     <Td>
-                      <StatusPill statusKey={t.status} />
+                      <StatusPill statusKey={t.status} statusMeta={STATUS_META} />
                     </Td>
                     <Td>
                       {t.status === 'completed' || pending === null
@@ -472,8 +483,8 @@ function PriorityBadge({ value }: { value: string }) {
   )
 }
 
-function StatusPill({ statusKey }: { statusKey: string }) {
-  const meta = STATUS_META[statusKey] || STATUS_META.active
+function StatusPill({ statusKey, statusMeta }: { statusKey: string; statusMeta: typeof BASE_STATUS_META }) {
+  const meta = statusMeta[statusKey] || statusMeta.active
   return (
     <span style={{
       display: 'inline-flex',

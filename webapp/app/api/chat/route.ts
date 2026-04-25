@@ -76,6 +76,8 @@ export async function POST(request: NextRequest) {
     backlog: tasks.filter(t => t.status === 'backlog'),
     active: tasks.filter(t => t.status === 'active'),
     in_progress: tasks.filter(t => t.status === 'in_progress'),
+    with_tech: tasks.filter(t => t.status === 'with_tech'),
+    with_design: tasks.filter(t => t.status === 'with_design'),
     completed: tasks.filter(t => t.status === 'completed'),
   }
 

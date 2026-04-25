@@ -18,7 +18,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
   }
 
-  const allowed = ['backlog', 'active', 'in_progress', 'completed']
+  const allowed = ['backlog', 'active', 'in_progress', 'with_tech', 'with_design', 'completed']
   if (status && !allowed.includes(status)) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
   }

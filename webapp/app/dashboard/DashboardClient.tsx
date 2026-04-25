@@ -30,44 +30,28 @@ type Props = {
   workspaceName: string
   userId: string
   slackUserId: string | null
+  delegationLabels: { with_tech: string; with_design: string }
 }
 
-const COLUMNS = [
-  {
-    id: 'backlog',
-    label: 'Inbox',
-    color: '#B45309',
-    accent: '#92400E',
-    glow: 'rgba(180,83,9,0.10)',
-    bar: 'linear-gradient(90deg, #92400E, #D97706)',
-  },
-  {
-    id: 'active',
-    label: 'To Do',
-    color: '#57534E',
-    accent: '#44403A',
-    glow: 'rgba(87,83,78,0.10)',
-    bar: 'linear-gradient(90deg, #44403A, #78716C)',
-  },
-  {
-    id: 'in_progress',
-    label: 'In Progress',
-    color: '#3B5BDB',
-    accent: '#2A3EB1',
-    glow: 'rgba(59,91,219,0.10)',
-    bar: 'linear-gradient(90deg, #2A3EB1, #5E72E4)',
-  },
-  {
-    id: 'completed',
-    label: 'Done',
-    color: '#059669',
-    accent: '#047857',
-    glow: 'rgba(5,150,105,0.10)',
-    bar: 'linear-gradient(90deg, #047857, #10B981)',
-  },
+type KanbanColumn = {
+  id: string
+  label: string
+  color: string
+  accent: string
+  glow: string
+  bar: string
+}
+
+const CORE_COLUMNS: KanbanColumn[] = [
+  { id: 'backlog',     label: 'Inbox',       color: '#B45309', accent: '#92400E', glow: 'rgba(180,83,9,0.10)',  bar: 'linear-gradient(90deg, #92400E, #D97706)' },
+  { id: 'active',      label: 'To Do',       color: '#57534E', accent: '#44403A', glow: 'rgba(87,83,78,0.10)',  bar: 'linear-gradient(90deg, #44403A, #78716C)' },
+  { id: 'in_progress', label: 'In Progress', color: '#3B5BDB', accent: '#2A3EB1', glow: 'rgba(59,91,219,0.10)', bar: 'linear-gradient(90deg, #2A3EB1, #5E72E4)' },
 ]
 
-export default function DashboardClient({ initialTasks, workspaceId, workspaceName, userId, slackUserId }: Props) {
+const DELEGATION_IDS = ['with_tech', 'with_design'] as const
+type DelegationId = typeof DELEGATION_IDS[number]
+
+export default function DashboardClient({ initialTasks, workspaceId, workspaceName, userId, slackUserId, delegationLabels }: Props) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks as unknown as Task[])
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
@@ -79,10 +63,36 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
   const [flashField, setFlashField] = useState<string | null>(null)
   const [dragOverHalf, setDragOverHalf] = useState<'top' | 'bottom'>('bottom')
   const [justDroppedId, setJustDroppedId] = useState<string | null>(null)
+  const [localDelegationLabels, setLocalDelegationLabels] = useState(delegationLabels)
+  const [renamingColId, setRenamingColId] = useState<DelegationId | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [hoveredColId, setHoveredColId] = useState<string | null>(null)
   const dragTask = useRef<Task | null>(null)
   const dragOverHalfRef = useRef<'top' | 'bottom'>('bottom')
   const reorderCooldown = useRef(false)
   const searchParams = useSearchParams()
+
+  // Build columns including delegation columns with workspace-editable labels
+  const COLUMNS: KanbanColumn[] = [
+    ...CORE_COLUMNS,
+    { id: 'with_tech',   label: localDelegationLabels.with_tech,   color: '#4F46E5', accent: '#3730A3', glow: 'rgba(79,70,229,0.10)',  bar: 'linear-gradient(90deg,#3730A3,#6366F1)' },
+    { id: 'with_design', label: localDelegationLabels.with_design,  color: '#7C3AED', accent: '#6D28D9', glow: 'rgba(124,58,237,0.10)', bar: 'linear-gradient(90deg,#6D28D9,#A78BFA)' },
+    { id: 'completed',   label: 'Done',                             color: '#059669', accent: '#047857', glow: 'rgba(5,150,105,0.10)',  bar: 'linear-gradient(90deg,#047857,#10B981)' },
+  ]
+
+  async function saveRename(colId: DelegationId) {
+    const trimmed = renameValue.trim()
+    setRenamingColId(null)
+    if (!trimmed || trimmed === localDelegationLabels[colId]) return
+    // Optimistic update
+    setLocalDelegationLabels(prev => ({ ...prev, [colId]: trimmed }))
+    const bodyKey = colId === 'with_tech' ? 'tech_label' : 'design_label'
+    await fetch('/api/workspace/labels', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [bodyKey]: trimmed }),
+    })
+  }
 
   useEffect(() => {
     if (searchParams.get('slack_connected') === 'true') {
@@ -334,10 +344,50 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
               <div style={{ ...s.colBar, background: col.bar }} />
 
               {/* Column header */}
-              <div style={s.colHeader}>
+              <div
+                style={s.colHeader}
+                onMouseEnter={() => setHoveredColId(col.id)}
+                onMouseLeave={() => setHoveredColId(null)}
+              >
                 <div style={s.colHeaderLeft}>
                   <span style={{ ...s.colDot, background: col.accent, boxShadow: `0 0 8px ${col.accent}88` }} />
-                  <span style={{ ...s.colLabel, color: col.color }}>{col.label}</span>
+                  {/* Delegation columns get inline rename on click */}
+                  {(DELEGATION_IDS as readonly string[]).includes(col.id) && renamingColId === col.id ? (
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={e => setRenameValue(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') saveRename(col.id as DelegationId)
+                        if (e.key === 'Escape') setRenamingColId(null)
+                      }}
+                      onBlur={() => saveRename(col.id as DelegationId)}
+                      style={{
+                        fontSize: '12px', fontWeight: 700, letterSpacing: '0.07em',
+                        textTransform: 'uppercase', color: col.color,
+                        background: 'transparent', border: 'none',
+                        borderBottom: `1.5px solid ${col.accent}`,
+                        outline: 'none', padding: '0 2px', width: '110px',
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <span style={{ ...s.colLabel, color: col.color }}>{col.label}</span>
+                      {(DELEGATION_IDS as readonly string[]).includes(col.id) && hoveredColId === col.id && (
+                        <button
+                          onClick={() => { setRenamingColId(col.id as DelegationId); setRenameValue(col.label) }}
+                          title="Rename column"
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            padding: '0 2px', color: col.color, opacity: 0.6,
+                            fontSize: '11px', lineHeight: 1, display: 'flex', alignItems: 'center',
+                          }}
+                        >
+                          ✏
+                        </button>
+                      )}
+                    </>
+                  )}
                   <span style={{ ...s.colCount, color: col.color, borderColor: `${col.accent}40`, background: `${col.glow}` }}>
                     {colTasks.length}
                   </span>
@@ -408,6 +458,7 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
         <TaskDetailModal
           task={detailTask}
           flashField={flashField}
+          columns={COLUMNS}
           onClose={() => setDetailTask(null)}
           onUpdateField={(field, value) => updateTaskField(detailTask.id, field, value)}
           onStatusChange={(status) => { moveTask(detailTask.id, status); setDetailTask(prev => prev ? { ...prev, status } : prev); setFlashField('status'); setTimeout(() => setFlashField(null), 500) }}
@@ -520,7 +571,7 @@ function PriorityDropdown({ current, onSelect, anchorRef }: { current: string; o
 
 function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf, isJustDropped, onDragStart, onDragEnd, onCardDragOver, onUpdateTitle, onMove, onDelete, onOpenDetail, onUpdateField, columns }: {
   task: Task
-  col: typeof COLUMNS[0]
+  col: KanbanColumn
   isDragging: boolean
   isDeleting?: boolean
   isDropTarget?: boolean
@@ -534,7 +585,7 @@ function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf,
   onDelete: (id: string) => void
   onOpenDetail: () => void
   onUpdateField: (field: string, value: string | null) => void
-  columns: typeof COLUMNS
+  columns: KanbanColumn[]
 }) {
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -938,16 +989,17 @@ const qa: Record<string, React.CSSProperties> = {
 // ─── Task Detail Modal ───────────────────────────────────────────────────────
 
 const PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'] as const
-const STATUS_OPTIONS = COLUMNS.map(c => ({ id: c.id, label: c.label, color: c.accent }))
 
-function TaskDetailModal({ task, flashField, onClose, onUpdateField, onStatusChange, onTitleChange }: {
+function TaskDetailModal({ task, flashField, columns, onClose, onUpdateField, onStatusChange, onTitleChange }: {
   task: Task
   flashField?: string | null
+  columns: KanbanColumn[]
   onClose: () => void
   onUpdateField: (field: string, value: string | null) => void
   onStatusChange: (status: string) => void
   onTitleChange: (title: string) => void
 }) {
+  const STATUS_OPTIONS = columns.map(c => ({ id: c.id, label: c.label, color: c.accent }))
   const [editingTitle, setEditingTitle] = useState(false)
   const [localTitle, setLocalTitle] = useState(task.title)
   const [updates, setUpdates] = useState<TaskUpdate[]>([])
@@ -991,7 +1043,7 @@ function TaskDetailModal({ task, flashField, onClose, onUpdateField, onStatusCha
     setSubmitting(false)
   }
 
-  const col = COLUMNS.find(c => c.id === task.status) || COLUMNS[1]
+  const col = columns.find(c => c.id === task.status) || columns[1]
 
   return (
     <div style={m.overlay} onClick={onClose}>
