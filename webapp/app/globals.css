@@ -1,40 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  /* Canvas / surfaces — warm off-white inspired by Asana, Linear, Notion */
-  --bg: #FAF8F4;
+  /* Canvas / surfaces — clean neutral inspired by Figma design */
+  --bg: #F3F4F6;
   --surface: #FFFFFF;
-  --surface2: #F4F0E8;
-  --surface3: #EDE7DB;
+  --surface2: #F9FAFB;
+  --surface3: #F3F4F6;
 
-  /* Borders — warm neutral, subtle but defined */
-  --border: #E6E0D3;
-  --border2: #D5CCB9;
+  /* Borders — clean cool grey */
+  --border: #E5E7EB;
+  --border2: #D1D5DB;
 
-  /* Text — warm near-black, not pure black */
-  --text: #1F1D18;
-  --text2: #44403A;
-  --muted: #8A8275;
+  /* Text — cool near-black */
+  --text: #111827;
+  --text2: #374151;
+  --muted: #9CA3AF;
 
-  /* Accent — warm coral, reads fresh and non-AI */
-  --accent: #E06C4D;
-  --accent-light: #EF8265;
-  --accent-glow: rgba(224, 108, 77, 0.12);
+  /* Accent — indigo blue, clean and professional */
+  --accent: #4F46E5;
+  --accent-light: #6366F1;
+  --accent-glow: rgba(79, 70, 229, 0.12);
 
-  /* Status color tokens — muted and warmer than neon versions */
-  --todo-color: #78716C;
-  --todo-dot: #57534E;
-  --progress-color: #3B5BDB;
-  --progress-dot: #2A3EB1;
+  /* Status color tokens */
+  --todo-color: #4F46E5;
+  --todo-dot: #3730A3;
+  --progress-color: #D97706;
+  --progress-dot: #B45309;
   --done-color: #059669;
   --done-dot: #047857;
-  --inbox-color: #B45309;
-  --inbox-dot: #92400E;
+  --inbox-color: #6B7280;
+  --inbox-dot: #4B5563;
 
-  /* Card / modal shadows — soft and short */
-  --shadow-card: 0 1px 3px rgba(20, 18, 14, 0.06), 0 1px 2px rgba(20, 18, 14, 0.04);
-  --shadow-elevated: 0 4px 12px rgba(20, 18, 14, 0.08), 0 2px 4px rgba(20, 18, 14, 0.04);
-  --shadow-modal: 0 16px 40px rgba(20, 18, 14, 0.14), 0 4px 12px rgba(20, 18, 14, 0.06);
+  /* Card / modal shadows — soft cool */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.14), 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -65,7 +65,7 @@ body {
 }
 
 @keyframes confirmFlash {
-  0% { background-color: rgba(224, 108, 77, 0.16); }
+  0% { background-color: rgba(79, 70, 229, 0.16); }
   100% { background-color: transparent; }
 }
 
@@ -81,13 +81,13 @@ body {
 }
 
 @keyframes dropFlash {
-  0% { box-shadow: 0 0 0 2px rgba(224, 108, 77, 0.55), 0 0 14px rgba(224, 108, 77, 0.3); transform: scale(1.02); }
-  50% { box-shadow: 0 0 0 2px rgba(224, 108, 77, 0.3), 0 0 8px rgba(224, 108, 77, 0.15); transform: scale(1); }
+  0% { box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.55), 0 0 14px rgba(79, 70, 229, 0.3); transform: scale(1.02); }
+  50% { box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.3), 0 0 8px rgba(79, 70, 229, 0.15); transform: scale(1); }
   100% { box-shadow: none; transform: scale(1); }
 }
 
-/* Scrollbar — slim, warm, unobtrusive */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+/* Scrollbar — slim, clean */
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(31, 29, 24, 0.14); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(31, 29, 24, 0.24); }
+::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.12); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.22); }

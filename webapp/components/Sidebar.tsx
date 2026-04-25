@@ -112,7 +112,8 @@ export default function Sidebar({ user, workspace, role }: Props) {
         {/* Workspace */}
         <div style={{ ...s.workspaceRow, padding: collapsed ? '4px 0' : '4px 8px', justifyContent: collapsed ? 'center' : 'flex-start' }}>
           <div style={s.workspaceAvatar}>
-            {workspace?.name?.[0]?.toUpperCase() || 'P'}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/ping_logo.jpeg" alt="Ping" width={28} height={28} style={{ borderRadius: '8px', objectFit: 'cover', display: 'block' }} />
           </div>
           {!collapsed && (
             <div style={s.workspaceName} title={workspace?.name || 'Ping'}>
@@ -296,14 +297,11 @@ const s: Record<string, React.CSSProperties> = {
     width: '28px',
     height: '28px',
     borderRadius: '8px',
-    background: 'linear-gradient(135deg, #E06C4D, #F0926E)',
+    overflow: 'hidden',
+    flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '13px',
-    fontWeight: 700,
-    color: 'white',
-    flexShrink: 0,
   },
   workspaceName: {
     fontSize: '14px',
@@ -327,14 +325,14 @@ const s: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap',
     overflow: 'hidden',
   },
-  navItemActive: { background: 'var(--surface2)' },
+  navItemActive: { background: 'rgba(79,70,229,0.08)', color: 'var(--accent)' },
   navIcon: { flexShrink: 0, display: 'flex', alignItems: 'center' },
   bottom: { display: 'flex', flexDirection: 'column', gap: '8px' },
   inviteBtn: {
     display: 'flex', alignItems: 'center', gap: '8px',
-    background: 'var(--accent-glow)', border: '1px solid rgba(224,108,77,0.28)',
+    background: 'var(--accent-glow)', border: '1px solid rgba(79,70,229,0.25)',
     borderRadius: '8px', padding: '8px 10px',
-    fontSize: '12px', fontWeight: 500, color: 'var(--accent-light)',
+    fontSize: '12px', fontWeight: 500, color: 'var(--accent)',
     cursor: 'pointer', fontFamily: 'inherit',
     whiteSpace: 'nowrap' as const,
   },
@@ -395,7 +393,7 @@ const s: Record<string, React.CSSProperties> = {
     width: '28px',
     height: '28px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #E06C4D, #F0926E)',
+    background: 'linear-gradient(135deg, #4F46E5, #6366F1)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

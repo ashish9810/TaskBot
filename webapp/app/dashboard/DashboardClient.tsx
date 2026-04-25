@@ -43,9 +43,9 @@ type KanbanColumn = {
 }
 
 const CORE_COLUMNS: KanbanColumn[] = [
-  { id: 'backlog',     label: 'Inbox',       color: '#B45309', accent: '#92400E', glow: 'rgba(180,83,9,0.10)',  bar: 'linear-gradient(90deg, #92400E, #D97706)' },
-  { id: 'active',      label: 'To Do',       color: '#57534E', accent: '#44403A', glow: 'rgba(87,83,78,0.10)',  bar: 'linear-gradient(90deg, #44403A, #78716C)' },
-  { id: 'in_progress', label: 'In Progress', color: '#3B5BDB', accent: '#2A3EB1', glow: 'rgba(59,91,219,0.10)', bar: 'linear-gradient(90deg, #2A3EB1, #5E72E4)' },
+  { id: 'backlog',     label: 'Inbox',       color: '#6B7280', accent: '#4B5563', glow: 'rgba(107,114,128,0.10)', bar: 'linear-gradient(90deg,#4B5563,#9CA3AF)' },
+  { id: 'active',      label: 'To Do',       color: '#4F46E5', accent: '#3730A3', glow: 'rgba(79,70,229,0.10)',   bar: 'linear-gradient(90deg,#3730A3,#6366F1)' },
+  { id: 'in_progress', label: 'In Progress', color: '#D97706', accent: '#B45309', glow: 'rgba(217,119,6,0.10)',   bar: 'linear-gradient(90deg,#B45309,#F59E0B)' },
 ]
 
 const DELEGATION_IDS = ['with_tech', 'with_design'] as const
@@ -372,14 +372,14 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
                     />
                   ) : (
                     <>
-                      <span style={{ ...s.colLabel, color: col.color }}>{col.label}</span>
+                      <span style={s.colLabel}>{col.label}</span>
                       {(DELEGATION_IDS as readonly string[]).includes(col.id) && hoveredColId === col.id && (
                         <button
                           onClick={() => { setRenamingColId(col.id as DelegationId); setRenameValue(col.label) }}
                           title="Rename column"
                           style={{
                             background: 'none', border: 'none', cursor: 'pointer',
-                            padding: '0 2px', color: col.color, opacity: 0.6,
+                            padding: '0 2px', color: 'var(--muted)', opacity: 0.7,
                             fontSize: '11px', lineHeight: 1, display: 'flex', alignItems: 'center',
                           }}
                         >
@@ -388,9 +388,7 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
                       )}
                     </>
                   )}
-                  <span style={{ ...s.colCount, color: col.color, borderColor: `${col.accent}40`, background: `${col.glow}` }}>
-                    {colTasks.length}
-                  </span>
+                  <span style={s.colCount}>({colTasks.length})</span>
                 </div>
                 <button
                   onClick={() => setQuickAddCol(quickAddCol === col.id ? null : col.id)}
@@ -501,11 +499,11 @@ function QuickAddCard({ onAdd, onCancel, accentColor }: { onAdd: (t: string) => 
   )
 }
 
-const priorityColors: Record<string, { color: string; bg: string }> = {
-  low: { color: '#059669', bg: 'rgba(5,150,105,0.10)' },
-  medium: { color: '#B45309', bg: 'rgba(180,83,9,0.10)' },
-  high: { color: '#C2410C', bg: 'rgba(194,65,12,0.10)' },
-  urgent: { color: '#B91C1C', bg: 'rgba(185,28,28,0.10)' },
+const priorityColors: Record<string, { color: string; bg: string; border: string; label: string }> = {
+  low:    { color: '#059669', bg: 'rgba(5,150,105,0.12)',   border: 'rgba(5,150,105,0.3)',   label: 'Low' },
+  medium: { color: '#4F46E5', bg: 'rgba(79,70,229,0.12)',   border: 'rgba(79,70,229,0.3)',   label: 'Important' },
+  high:   { color: '#E11D48', bg: 'rgba(225,29,72,0.10)',   border: 'rgba(225,29,72,0.28)',  label: 'High Priority' },
+  urgent: { color: '#B91C1C', bg: 'rgba(185,28,28,0.10)',   border: 'rgba(185,28,28,0.28)',  label: 'Urgent' },
 }
 
 // ─── Kanban Card ─────────────────────────────────────────────────────────────
@@ -515,7 +513,7 @@ function PriorityIcon({ priority, onClick }: { priority: string; onClick: (e: Re
   const color = priorityColors[p]?.color || 'var(--muted)'
   const bars = p === 'urgent' ? 4 : p === 'high' ? 3 : p === 'medium' ? 2 : p === 'low' ? 1 : 0
   return (
-    <button onClick={onClick} style={c.inlineBtn} title={`Priority: ${p}`}>
+    <button onClick={onClick} style={c.inlineBtn} title={`Priority: ${p || 'none'}`}>
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ pointerEvents: 'none' }}>
         {[0,1,2,3].map(i => (
           <rect key={i} x={1 + i * 3.5} y={10 - (i + 1) * 2.2} width="2.5" height={(i + 1) * 2.2}
@@ -619,16 +617,28 @@ function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf,
           ...c.card,
           ...(isDragging ? c.dragging : {}),
           ...(hovered && !isDragging ? c.hover : {}),
-          borderLeftColor: col.accent,
           cursor: 'pointer',
           ...(isDeleting ? { animation: 'fadeOutShrink 0.35s ease forwards', pointerEvents: 'none' as const } : {}),
           ...(isJustDropped ? { animation: 'dropFlash 0.6s ease' } : {}),
         }}
       >
-      {/* Left accent stripe */}
-      <div style={{ ...c.stripe, background: col.bar }} />
-
       <div style={c.body}>
+        {/* Priority pill badge — top of card, Figma style */}
+        {task.priority && task.priority !== 'none' && priorityColors[task.priority] && (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center',
+            padding: '2px 8px', borderRadius: '100px',
+            fontSize: '11px', fontWeight: 600,
+            color: priorityColors[task.priority].color,
+            background: priorityColors[task.priority].bg,
+            border: `1px solid ${priorityColors[task.priority].border}`,
+            alignSelf: 'flex-start',
+            marginBottom: '2px',
+          }}>
+            {priorityColors[task.priority].label}
+          </div>
+        )}
+
         {/* Title */}
         <div style={{ ...c.title, ...(isCompleted ? c.titleDone : {}) }}>
           {task.title || '(untitled)'}
@@ -636,47 +646,41 @@ function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf,
 
         {/* Footer row */}
         <div style={c.footer}>
-          {/* Status pill */}
-          <span style={{ ...c.statusPill, color: col.color, background: col.glow, borderColor: `${col.accent}30` }}>
-            <span style={{ ...c.statusDot, background: col.accent }} />
-            {col.label}
-          </span>
+          {/* Due date */}
+          <div style={{ position: 'relative' }} data-no-modal>
+            <input
+              ref={dateInputRef}
+              type="date"
+              value={task.due_date || ''}
+              onChange={(e) => onUpdateField('due_date', e.target.value || null)}
+              style={c.hiddenDateInput}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={(e) => { e.stopPropagation(); dateInputRef.current?.showPicker?.(); dateInputRef.current?.click() }}
+              style={{ ...c.inlineBtn, color: task.due_date ? 'var(--accent)' : 'var(--muted)' }}
+              title={task.due_date ? `Due: ${task.due_date}` : 'Set due date'}
+            >
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ pointerEvents: 'none' }}>
+                <rect x="1.5" y="2.5" width="11" height="9.5" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M1.5 5.5h11" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M4.5 1v2M9.5 1v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              {task.due_date && (
+                <span style={c.dueDateText}>
+                  {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              )}
+            </button>
+          </div>
 
           <div style={c.footerRight}>
-            {/* Inline priority icon */}
+            {/* Priority dropdown (accessible via icon in footer) */}
             <div ref={priorityAnchorRef} style={{ position: 'relative' }} data-no-modal>
               <PriorityIcon priority={task.priority || 'none'} onClick={(e) => { e.stopPropagation(); setPriorityOpen(v => !v); setMenuOpen(false) }} />
               {priorityOpen && (
                 <PriorityDropdown current={task.priority || 'none'} onSelect={(p) => { onUpdateField('priority', p); setPriorityOpen(false) }} anchorRef={priorityAnchorRef} />
               )}
-            </div>
-
-            {/* Inline due date — single click opens native picker */}
-            <div style={{ position: 'relative' }} data-no-modal>
-              <input
-                ref={dateInputRef}
-                type="date"
-                value={task.due_date || ''}
-                onChange={(e) => onUpdateField('due_date', e.target.value || null)}
-                style={c.hiddenDateInput}
-                onClick={(e) => e.stopPropagation()}
-              />
-              <button
-                onClick={(e) => { e.stopPropagation(); dateInputRef.current?.showPicker?.(); dateInputRef.current?.click() }}
-                style={{ ...c.inlineBtn, color: task.due_date ? 'var(--text)' : 'var(--muted)' }}
-                title={task.due_date ? `Due: ${task.due_date}` : 'Set due date'}
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ pointerEvents: 'none' }}>
-                  <rect x="1.5" y="2.5" width="11" height="9.5" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                  <path d="M1.5 5.5h11" stroke="currentColor" strokeWidth="1.2"/>
-                  <path d="M4.5 1v2M9.5 1v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-                <span style={c.dueDateText}>
-                  {task.due_date
-                    ? new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                    : 'Due Date'}
-                </span>
-              </button>
             </div>
 
             {/* More menu */}
@@ -699,7 +703,7 @@ function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf,
                       </button>
                     ))}
                     <div style={c.menuDivider} />
-                    <button onClick={() => { setMenuOpen(false); onDelete(task.id) }} style={{ ...c.menuItem, color: '#f87171' }}>
+                    <button onClick={() => { setMenuOpen(false); onDelete(task.id) }} style={{ ...c.menuItem, color: '#EF4444' }}>
                       Delete
                     </button>
                   </div>
@@ -741,7 +745,7 @@ const s: Record<string, React.CSSProperties> = {
   heading: { fontSize: '22px', fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text)' },
   workspaceBadge: {
     background: 'var(--accent-glow)',
-    border: '1px solid rgba(224,108,77,0.28)',
+    border: '1px solid rgba(79,70,229,0.25)',
     borderRadius: '100px',
     padding: '3px 12px',
     fontSize: '12px',
@@ -770,49 +774,45 @@ const s: Record<string, React.CSSProperties> = {
   column: {
     display: 'flex',
     flexDirection: 'column',
-    width: '340px',
-    minWidth: '300px',
+    width: '320px',
+    minWidth: '280px',
     height: '100%',
     flexShrink: 0,
-    background: 'var(--surface)',
-    borderRadius: '12px',
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: 'var(--border)',
+    background: '#F1F2F4',
+    borderRadius: '16px',
+    border: '1px solid var(--border)',
     transition: 'border-color 0.2s, box-shadow 0.2s',
   },
-  columnOver: { borderColor: 'rgba(224,108,77,0.55)' },
+  columnOver: { borderColor: 'rgba(79,70,229,0.45)', boxShadow: '0 0 0 2px rgba(79,70,229,0.15)' },
 
-  colBar: { height: '3px', width: '100%', flexShrink: 0 },
+  colBar: { display: 'none' },
 
   colHeader: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '14px 14px 10px',
+    padding: '14px 16px 10px',
     flexShrink: 0,
   },
   colHeaderLeft: { display: 'flex', alignItems: 'center', gap: '8px' },
-  colDot: { width: '9px', height: '9px', borderRadius: '50%', flexShrink: 0 },
-  colLabel: { fontSize: '12px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' as const },
+  colDot: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0 },
+  colLabel: { fontSize: '14px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
   colCount: {
-    fontSize: '11px', fontWeight: 600,
-    border: '1px solid',
-    borderRadius: '100px',
-    padding: '1px 8px',
+    fontSize: '13px', fontWeight: 400, color: 'var(--muted)',
   },
   addBtn: {
-    background: 'var(--surface2)',
-    border: '1px solid var(--border)',
-    borderRadius: '7px',
+    background: 'var(--surface)',
+    border: '1.5px solid var(--border2)',
+    borderRadius: '50%',
     cursor: 'pointer',
     color: 'var(--text2)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: '26px', height: '26px', padding: 0,
-    transition: 'background 0.15s',
+    transition: 'background 0.15s, border-color 0.15s',
+    flexShrink: 0,
   },
 
   cardsList: {
     display: 'flex', flexDirection: 'column', gap: '8px',
-    padding: '6px 10px 14px',
+    padding: '4px 10px 14px',
     overflowY: 'auto',
     flex: 1,
     minHeight: 0,
@@ -820,7 +820,7 @@ const s: Record<string, React.CSSProperties> = {
 
   emptyCol: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    borderWidth: '1.5px', borderStyle: 'dashed', borderColor: 'var(--border)',
+    borderWidth: '1.5px', borderStyle: 'dashed', borderColor: 'var(--border2)',
     borderRadius: '12px',
     padding: '28px 20px',
     fontSize: '12px', color: 'var(--muted)',
@@ -835,46 +835,41 @@ const s: Record<string, React.CSSProperties> = {
 const c: Record<string, React.CSSProperties> = {
   card: {
     background: 'var(--surface)',
-    borderRadius: '10px',
+    borderRadius: '12px',
     border: '1px solid var(--border)',
-    borderLeftWidth: '3px',
-    borderLeftStyle: 'solid',
-    borderLeftColor: 'transparent',
     padding: '0',
     cursor: 'grab',
     display: 'flex',
-    minHeight: '72px',
+    flexDirection: 'column',
     flexShrink: 0,
-    transition: 'background 0.15s, box-shadow 0.15s, border-color 0.15s',
+    transition: 'box-shadow 0.15s, border-color 0.15s',
     userSelect: 'none' as const,
     overflow: 'hidden',
-    boxShadow: 'var(--shadow-card)',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
   },
-  dragging: { opacity: 0.35, transform: 'scale(0.98)', cursor: 'grabbing' },
+  dragging: { opacity: 0.4, transform: 'scale(0.98)', cursor: 'grabbing', boxShadow: 'none' },
   dropIndicatorTop: {
     position: 'absolute' as const, top: '-4px', left: '4px', right: '4px',
     height: '3px', borderRadius: '2px',
-    background: 'linear-gradient(90deg, #E06C4D, #F0926E)',
-    boxShadow: '0 0 8px rgba(224,108,77,0.5)',
+    background: 'linear-gradient(90deg, #3730A3, #6366F1)',
+    boxShadow: '0 0 8px rgba(79,70,229,0.5)',
     zIndex: 10,
   },
   dropIndicatorBottom: {
     position: 'absolute' as const, bottom: '-4px', left: '4px', right: '4px',
     height: '3px', borderRadius: '2px',
-    background: 'linear-gradient(90deg, #E06C4D, #F0926E)',
-    boxShadow: '0 0 8px rgba(224,108,77,0.5)',
+    background: 'linear-gradient(90deg, #3730A3, #6366F1)',
+    boxShadow: '0 0 8px rgba(79,70,229,0.5)',
     zIndex: 10,
   },
   hover: {
-    background: 'var(--surface2)',
-    borderColor: 'var(--border2)',
-    boxShadow: 'var(--shadow-elevated)',
+    borderColor: 'rgba(79,70,229,0.35)',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.09), 0 1px 3px rgba(0,0,0,0.06)',
   },
-  stripe: { width: '3px', flexShrink: 0 },
-  body: { flex: 1, padding: '12px 14px 10px', display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 },
+  body: { flex: 1, padding: '12px 14px 11px', display: 'flex', flexDirection: 'column', gap: '7px', minWidth: 0 },
 
   title: {
-    fontSize: '14px', fontWeight: 500, color: 'var(--text)',
+    fontSize: '14px', fontWeight: 600, color: 'var(--text)',
     lineHeight: 1.45, cursor: 'text', wordBreak: 'break-word' as const,
   },
   titleDone: { textDecoration: 'line-through' },
@@ -958,11 +953,11 @@ const c: Record<string, React.CSSProperties> = {
 // Quick add styles
 const qa: Record<string, React.CSSProperties> = {
   card: {
-    background: 'var(--surface3)',
-    border: '1.5px solid',
+    background: 'var(--surface)',
+    border: '1.5px solid rgba(79,70,229,0.35)',
     borderRadius: '12px', padding: '11px 12px',
     display: 'flex', flexDirection: 'column', gap: '10px',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
     animation: 'popIn 0.15s ease',
   },
   input: {
@@ -1211,7 +1206,7 @@ function TaskDetailModal({ task, flashField, columns, onClose, onUpdateField, on
 // Modal styles
 const m: Record<string, React.CSSProperties> = {
   overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(20,18,14,0.45)',
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 1000, padding: '24px',
     backdropFilter: 'blur(2px)',
