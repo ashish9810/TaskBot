@@ -252,7 +252,7 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
       const res = await fetch('/api/tasks/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), status }),
+        body: JSON.stringify({ title: title.trim(), status, priority: 'low' }),
       })
       const task = await res.json()
       if (res.ok && task.id) setTasks(prev => [{ ...task, status }, ...prev])
@@ -265,6 +265,9 @@ export default function DashboardClient({ initialTasks, workspaceId, workspaceNa
     // Flash the field in modal to confirm change
     setFlashField(field)
     setTimeout(() => setFlashField(null), 500)
+    // Suppress the realtime echo from our own PATCH so it doesn't re-sort the list
+    reorderCooldown.current = true
+    setTimeout(() => { reorderCooldown.current = false }, 2000)
     await fetch(`/api/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -565,27 +568,10 @@ const priorityColors: Record<string, { color: string; bg: string; border: string
 
 // ─── Kanban Card ─────────────────────────────────────────────────────────────
 
-function PriorityIcon({ priority, onClick }: { priority: string; onClick: (e: React.MouseEvent) => void }) {
-  const p = priority || 'none'
-  const color = priorityColors[p]?.color || 'var(--muted)'
-  const bars = p === 'urgent' ? 4 : p === 'high' ? 3 : p === 'medium' ? 2 : p === 'low' ? 1 : 0
-  return (
-    <button onClick={onClick} style={c.inlineBtn} title={`Priority: ${p || 'none'}`}>
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ pointerEvents: 'none' }}>
-        {[0,1,2,3].map(i => (
-          <rect key={i} x={1 + i * 3.5} y={10 - (i + 1) * 2.2} width="2.5" height={(i + 1) * 2.2}
-            rx="0.5" fill={i < bars ? color : 'rgba(31,29,24,0.12)'} />
-        ))}
-      </svg>
-    </button>
-  )
-}
-
 function PriorityDropdown({ current, onSelect, anchorRef }: { current: string; onSelect: (p: string) => void; anchorRef: React.RefObject<HTMLDivElement | null> }) {
-  const options = ['none', 'low', 'medium', 'high', 'urgent'] as const
-  const labels: Record<string, string> = { none: 'No priority', low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' }
+  const options = ['low', 'medium', 'high', 'urgent'] as const
+  const labels: Record<string, string> = { low: 'Low', medium: 'Important', high: 'High Priority', urgent: 'Urgent' }
 
-  // Position fixed relative to anchor
   const rect = anchorRef.current?.getBoundingClientRect()
   const style: React.CSSProperties = {
     position: 'fixed',
@@ -593,30 +579,24 @@ function PriorityDropdown({ current, onSelect, anchorRef }: { current: string; o
     left: rect ? rect.left : 0,
     bottom: rect ? window.innerHeight - rect.top + 6 : 0,
     background: 'var(--surface)', border: '1px solid var(--border2)',
-    borderRadius: '10px', padding: '4px', minWidth: '160px',
+    borderRadius: '10px', padding: '4px', minWidth: '150px',
     boxShadow: 'var(--shadow-modal)',
   }
 
   return (
     <div style={style} onClick={(e) => e.stopPropagation()}>
-      <div style={{ padding: '6px 8px', fontSize: '10px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Set priority</div>
+      <div style={{ padding: '6px 8px', fontSize: '10px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Priority</div>
       {options.map(p => {
-        const isActive = (current || 'none') === p
-        const pColor = priorityColors[p]?.color || 'var(--muted)'
-        const bars = p === 'urgent' ? 4 : p === 'high' ? 3 : p === 'medium' ? 2 : p === 'low' ? 1 : 0
+        const isActive = current === p
+        const pc = priorityColors[p]
         return (
           <button key={p} onClick={() => onSelect(p)} style={{
             ...c.dropdownItem,
-            ...(isActive ? { background: 'var(--surface3)', color: 'var(--text)' } : {}),
+            ...(isActive ? { background: pc.bg, color: pc.color } : {}),
           }}>
-            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
-              {[0,1,2,3].map(i => (
-                <rect key={i} x={1 + i * 3.5} y={10 - (i + 1) * 2.2} width="2.5" height={(i + 1) * 2.2}
-                  rx="0.5" fill={i < bars ? pColor : 'rgba(31,29,24,0.12)'} />
-              ))}
-            </svg>
-            <span style={{ color: isActive ? pColor : undefined }}>{labels[p]}</span>
-            {isActive && <span style={{ marginLeft: 'auto', fontSize: '10px' }}>✓</span>}
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: pc.color, flexShrink: 0, display: 'inline-block' }} />
+            <span>{labels[p]}</span>
+            {isActive && <span style={{ marginLeft: 'auto', fontSize: '10px', color: pc.color }}>✓</span>}
           </button>
         )
       })}
@@ -716,21 +696,28 @@ function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf,
         }}
       >
       <div style={c.body}>
-        {/* Priority pill badge — top of card, Figma style */}
-        {task.priority && task.priority !== 'none' && priorityColors[task.priority] && (
-          <div style={{
-            display: 'inline-flex', alignItems: 'center',
-            padding: '2px 8px', borderRadius: '100px',
-            fontSize: '11px', fontWeight: 600,
-            color: priorityColors[task.priority].color,
-            background: priorityColors[task.priority].bg,
-            border: `1px solid ${priorityColors[task.priority].border}`,
-            alignSelf: 'flex-start',
-            marginBottom: '2px',
-          }}>
-            {priorityColors[task.priority].label}
-          </div>
-        )}
+        {/* Priority pill — always shown, clickable to change priority */}
+        <div ref={priorityAnchorRef} style={{ alignSelf: 'flex-start', marginBottom: '2px' }} data-no-modal>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setPriorityOpen(v => !v); setMenuOpen(false) }}
+            style={{
+              display: 'inline-flex', alignItems: 'center',
+              padding: '2px 8px', borderRadius: '100px',
+              fontSize: '11px', fontWeight: 600,
+              color: priorityColors[task.priority || 'low']?.color || priorityColors.low.color,
+              background: priorityColors[task.priority || 'low']?.bg || priorityColors.low.bg,
+              border: `1px solid ${priorityColors[task.priority || 'low']?.border || priorityColors.low.border}`,
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}
+            title="Change priority"
+          >
+            {priorityColors[task.priority || 'low']?.label || 'Low'}
+          </button>
+          {priorityOpen && (
+            <PriorityDropdown current={task.priority || 'low'} onSelect={(p) => { onUpdateField('priority', p); setPriorityOpen(false) }} anchorRef={priorityAnchorRef} />
+          )}
+        </div>
 
         {/* Title */}
         <div style={{ ...c.title, ...(isCompleted ? c.titleDone : {}) }}>
@@ -768,14 +755,6 @@ function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf,
           </div>
 
           <div style={c.footerRight}>
-            {/* Priority dropdown (accessible via icon in footer) */}
-            <div ref={priorityAnchorRef} style={{ position: 'relative' }} data-no-modal>
-              <PriorityIcon priority={task.priority || 'none'} onClick={(e) => { e.stopPropagation(); setPriorityOpen(v => !v); setMenuOpen(false) }} />
-              {priorityOpen && (
-                <PriorityDropdown current={task.priority || 'none'} onSelect={(p) => { onUpdateField('priority', p); setPriorityOpen(false) }} anchorRef={priorityAnchorRef} />
-              )}
-            </div>
-
             {/* More menu */}
             {hovered && (
               <div ref={menuAnchorRef} style={{ position: 'relative' }} data-no-modal>
@@ -1066,7 +1045,7 @@ const qa: Record<string, React.CSSProperties> = {
 
 // ─── Task Detail Modal ───────────────────────────────────────────────────────
 
-const PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'] as const
+const PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const
 
 function TaskDetailModal({ task, flashField, columns, onClose, onUpdateField, onStatusChange, onTitleChange }: {
   task: Task
@@ -1183,14 +1162,14 @@ function TaskDetailModal({ task, flashField, columns, onClose, onUpdateField, on
                   onClick={() => onUpdateField('priority', p)}
                   style={{
                     ...m.statusChip,
-                    ...((task.priority || 'none') === p ? {
-                      background: (priorityColors[p]?.bg || 'rgba(148,163,184,0.1)'),
-                      borderColor: (priorityColors[p]?.color || '#64748b') + '60',
-                      color: priorityColors[p]?.color || '#94a3b8',
+                    ...((task.priority || 'low') === p ? {
+                      background: priorityColors[p].bg,
+                      borderColor: priorityColors[p].color + '60',
+                      color: priorityColors[p].color,
                     } : {}),
                   }}
                 >
-                  {p === 'none' ? 'None' : p.charAt(0).toUpperCase() + p.slice(1)}
+                  {priorityColors[p].label}
                 </button>
               ))}
             </div>
