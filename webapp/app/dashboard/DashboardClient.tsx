@@ -565,6 +565,41 @@ function PriorityDropdown({ current, onSelect, anchorRef }: { current: string; o
   )
 }
 
+function CardMoreMenu({ anchorRef, otherCols, onMove, onDelete }: {
+  anchorRef: React.RefObject<HTMLDivElement | null>
+  otherCols: KanbanColumn[]
+  onMove: (colId: string) => void
+  onDelete: () => void
+}) {
+  const rect = anchorRef.current?.getBoundingClientRect()
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    zIndex: 9999,
+    right: rect ? window.innerWidth - rect.right : 0,
+    bottom: rect ? window.innerHeight - rect.top + 6 : 0,
+    background: 'var(--surface)', border: '1px solid var(--border2)',
+    borderRadius: '12px', padding: '6px',
+    minWidth: '152px',
+    boxShadow: 'var(--shadow-modal)',
+    animation: 'popIn 0.15s ease',
+  }
+  return (
+    <div style={style} onClick={(e) => e.stopPropagation()}>
+      <div style={c.menuLabel}>Move to</div>
+      {otherCols.map(oc => (
+        <button key={oc.id} onClick={() => onMove(oc.id)} style={c.menuItem}>
+          <span style={{ ...c.menuDot, background: oc.accent }} />
+          {oc.label}
+        </button>
+      ))}
+      <div style={c.menuDivider} />
+      <button onClick={onDelete} style={{ ...c.menuItem, color: '#EF4444' }}>
+        Delete
+      </button>
+    </div>
+  )
+}
+
 function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf, isJustDropped, onDragStart, onDragEnd, onCardDragOver, onUpdateTitle, onMove, onDelete, onOpenDetail, onUpdateField, columns }: {
   task: Task
   col: KanbanColumn
@@ -588,6 +623,7 @@ function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf,
   const [priorityOpen, setPriorityOpen] = useState(false)
   const dateInputRef = useRef<HTMLInputElement>(null)
   const priorityAnchorRef = useRef<HTMLDivElement>(null)
+  const menuAnchorRef = useRef<HTMLDivElement>(null)
 
   const isCompleted = task.status === 'completed'
 
@@ -683,7 +719,7 @@ function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf,
 
             {/* More menu */}
             {hovered && (
-              <div style={{ position: 'relative' }} data-no-modal>
+              <div ref={menuAnchorRef} style={{ position: 'relative' }} data-no-modal>
                 <button onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); setPriorityOpen(false) }} style={c.moreBtn}>
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ pointerEvents: 'none' }}>
                     <circle cx="6.5" cy="2.5" r="1.2" fill="currentColor"/>
@@ -692,19 +728,12 @@ function KanbanCard({ task, col, isDragging, isDeleting, isDropTarget, dropHalf,
                   </svg>
                 </button>
                 {menuOpen && (
-                  <div style={c.menu}>
-                    <div style={c.menuLabel}>Move to</div>
-                    {otherCols.map(oc => (
-                      <button key={oc.id} onClick={() => { setMenuOpen(false); onMove(task.id, oc.id) }} style={c.menuItem}>
-                        <span style={{ ...c.menuDot, background: oc.accent }} />
-                        {oc.label}
-                      </button>
-                    ))}
-                    <div style={c.menuDivider} />
-                    <button onClick={() => { setMenuOpen(false); onDelete(task.id) }} style={{ ...c.menuItem, color: '#EF4444' }}>
-                      Delete
-                    </button>
-                  </div>
+                  <CardMoreMenu
+                    anchorRef={menuAnchorRef}
+                    otherCols={otherCols}
+                    onMove={(colId) => { setMenuOpen(false); onMove(task.id, colId) }}
+                    onDelete={() => { setMenuOpen(false); onDelete(task.id) }}
+                  />
                 )}
               </div>
             )}
@@ -846,7 +875,7 @@ const c: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     transition: 'box-shadow 0.15s, border-color 0.15s',
     userSelect: 'none' as const,
-    overflow: 'hidden',
+    overflow: 'visible',
     boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
   },
   dragging: { opacity: 0.4, transform: 'scale(0.98)', cursor: 'grabbing', boxShadow: 'none' },
@@ -901,14 +930,7 @@ const c: Record<string, React.CSSProperties> = {
     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: '24px', height: '24px', padding: 0,
   },
-  menu: {
-    position: 'absolute' as const, right: 0, bottom: '28px',
-    background: 'var(--surface)', border: '1px solid var(--border2)',
-    borderRadius: '12px', padding: '6px',
-    zIndex: 200, minWidth: '148px',
-    boxShadow: 'var(--shadow-modal)',
-    animation: 'popIn 0.15s ease',
-  },
+  menu: { /* kept for compat — actual menu uses position:fixed via CardMoreMenu */ },
   menuLabel: {
     fontSize: '10px', fontWeight: 700, color: 'var(--muted)',
     textTransform: 'uppercase' as const, letterSpacing: '0.08em',
