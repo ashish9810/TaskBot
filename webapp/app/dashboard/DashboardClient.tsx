@@ -586,11 +586,18 @@ function PriorityDropdown({ current, onSelect, anchorRef }: { current: string; o
   const labels: Record<string, string> = { low: 'Low', medium: 'Important', high: 'High Priority', urgent: 'Urgent' }
 
   const rect = anchorRef.current?.getBoundingClientRect()
+  if (!rect) return null
+
+  const estimatedHeight = 28 + 4 * 34 + 8 // label + 4 options + padding
+  const openDown = rect.top < estimatedHeight + 10
+
   const style: React.CSSProperties = {
     position: 'fixed',
     zIndex: 9999,
-    left: rect ? rect.left : 0,
-    bottom: rect ? window.innerHeight - rect.top + 6 : 0,
+    left: rect.left,
+    ...(openDown
+      ? { top: rect.bottom + 6 }
+      : { bottom: window.innerHeight - rect.top + 6 }),
     background: 'var(--surface)', border: '1px solid var(--border2)',
     borderRadius: '10px', padding: '4px', minWidth: '150px',
     boxShadow: 'var(--shadow-modal)',
@@ -624,11 +631,20 @@ function CardMoreMenu({ anchorRef, otherCols, onMove, onDelete }: {
   onDelete: () => void
 }) {
   const rect = anchorRef.current?.getBoundingClientRect()
+  if (!rect) return null
+
+  // Estimate menu height: label row + one row per col + divider + delete
+  const estimatedHeight = 28 + otherCols.length * 34 + 1 + 34 + 12
+  const spaceAbove = rect.top
+  const openDown = spaceAbove < estimatedHeight + 10
+
   const style: React.CSSProperties = {
     position: 'fixed',
     zIndex: 9999,
-    right: rect ? window.innerWidth - rect.right : 0,
-    bottom: rect ? window.innerHeight - rect.top + 6 : 0,
+    right: window.innerWidth - rect.right,
+    ...(openDown
+      ? { top: rect.bottom + 6 }
+      : { bottom: window.innerHeight - rect.top + 6 }),
     background: 'var(--surface)', border: '1px solid var(--border2)',
     borderRadius: '12px', padding: '6px',
     minWidth: '152px',
