@@ -52,41 +52,52 @@ const DELEGATION_IDS = ['with_tech', 'with_design'] as const
 type DelegationId = typeof DELEGATION_IDS[number]
 
 function ThemeToggle() {
+  // Read directly from DOM — avoids stale closure and hydration mismatch
   const [dark, setDark] = useState(false)
 
   useEffect(() => {
-    setDark(document.documentElement.getAttribute('data-theme') === 'dark')
+    // Sync state with whatever the inline script set before hydration
+    const current = document.documentElement.getAttribute('data-theme') === 'dark'
+    setDark(current)
   }, [])
 
   function toggle() {
-    const next = !dark
-    setDark(next)
-    if (next) {
-      document.documentElement.setAttribute('data-theme', 'dark')
-      localStorage.setItem('theme', 'dark')
-    } else {
+    // Read live DOM state, not stale closure
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+    if (isDark) {
       document.documentElement.removeAttribute('data-theme')
-      localStorage.setItem('theme', 'light')
+      try { localStorage.setItem('theme', 'light') } catch (_) {}
+      setDark(false)
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark')
+      try { localStorage.setItem('theme', 'dark') } catch (_) {}
+      setDark(true)
     }
   }
 
   return (
-    <button onClick={toggle} title={dark ? 'Switch to light mode' : 'Switch to dark mode'} style={{
-      display: 'flex', alignItems: 'center', gap: '7px',
-      background: 'var(--surface2)', border: '1px solid var(--border2)',
-      borderRadius: '20px', padding: '5px 12px 5px 8px',
-      cursor: 'pointer', color: 'var(--text2)',
-      fontSize: '12px', fontWeight: 500, fontFamily: 'inherit',
-      transition: 'background 0.2s, border-color 0.2s',
-    }}>
+    <button
+      type="button"
+      onClick={toggle}
+      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '7px',
+        background: 'var(--surface2)', border: '1px solid var(--border2)',
+        borderRadius: '20px', padding: '5px 12px 5px 8px',
+        cursor: 'pointer', color: 'var(--text2)',
+        fontSize: '12px', fontWeight: 500, fontFamily: 'inherit',
+        transition: 'background 0.2s, border-color 0.2s',
+        flexShrink: 0,
+      }}
+    >
       {dark ? (
-        /* Sun icon */
+        /* Sun — shown in dark mode, click to go light */
         <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
           <circle cx="10" cy="10" r="4" stroke="currentColor" strokeWidth="1.6"/>
           <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M14.36 5.64l1.42-1.42M4.22 15.78l1.42-1.42" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
         </svg>
       ) : (
-        /* Moon icon */
+        /* Moon — shown in light mode, click to go dark */
         <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
           <path d="M17.5 12.5A7.5 7.5 0 017.5 2.5a7.5 7.5 0 100 15 7.5 7.5 0 0010-5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>

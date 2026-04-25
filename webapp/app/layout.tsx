@@ -15,9 +15,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      {/* Restore theme before first paint to avoid flash */}
+    <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Restore theme before first paint — suppressHydrationWarning prevents React stripping data-theme */}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}})()`,
